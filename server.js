@@ -8,6 +8,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { db, now, transaction } = require('./db');
 
 const PORT = process.env.PORT || 4100;
@@ -98,6 +99,21 @@ function allStaffPublic() {
 function isOwnerPassword(pw) {
   const row = db.prepare("SELECT 1 FROM staff WHERE role = 'Owner' AND password = ? LIMIT 1").get(String(pw || ''));
   return !!row;
+}
+// --- login sessions: a token proves who is signed in, so owner actions need no re-typing ---
+function createSession(username, role) {
+  const token = crypto.randomBytes(24).toString('hex');
+  db.prepare('INSERT INTO sessions (token, username, role, created_at) VALUES (?, ?, ?, ?)').run(token, username, role, now());
+  return token;
+}
+function sessionOf(req) {
+  const token = req.headers['x-auth-token'];
+  if (!token) return null;
+  return db.prepare('SELECT * FROM sessions WHERE token = ?').get(String(token)) || null;
+}
+function isOwnerRequest(req) {
+  const s = sessionOf(req);
+  return !!(s && s.role === 'Owner');
 }
 function orderOut(o) {
   return { id: o.id, ch: o.channel, cust: o.customer, area: o.area,
@@ -372,7 +388,14 @@ const server = http.createServer(async (req, res) => {
       const pw = String(body.password || '');
       const row = db.prepare('SELECT * FROM staff WHERE lower(username) = ?').get(uname);
       if (!row || row.password !== pw) return sendJSON(res, 401, { error: 'Wrong username or password' });
-      return sendJSON(res, 200, { user: { name: row.name, role: row.role, c: row.color, username: row.username } });
+      const token = createSession(row.username, row.role);
+      return sendJSON(res, 200, { user: { name: row.name, role: row.role, c: row.color, username: row.username }, token });
+    }
+
+    if (p === '/api/logout' && method === 'POST') {
+      const token = req.headers['x-auth-token'];
+      if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(String(token));
+      return sendJSON(res, 200, { ok: true });
     }
 
     if (p === '/api/sales' && method === 'POST') {
@@ -425,8 +448,8 @@ const server = http.createServer(async (req, res) => {
 
     // Owner adds a new staff member (confirmed with the owner's own password).
     if (p === '/api/staff' && method === 'POST') {
+      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can add staff' });
       const body = await readBody(req);
-      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
       const name = String(body.name || '').trim();
       const username = String(body.username || '').trim().toLowerCase();
       const role = String(body.role || '').trim();
@@ -442,8 +465,7 @@ const server = http.createServer(async (req, res) => {
     let m;
     // Owner removes a staff member (confirmed with the owner's own password).
     if ((m = p.match(/^\/api\/staff\/(\d+)$/)) && method === 'DELETE') {
-      const body = await readBody(req);
-      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
+      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can remove staff' });
       const target = db.prepare('SELECT * FROM staff WHERE id = ?').get(Number(m[1]));
       if (!target) return sendJSON(res, 404, { error: 'no such staff member' });
       if (target.role === 'Owner' && db.prepare("SELECT COUNT(*) AS c FROM staff WHERE role = 'Owner'").get().c <= 1) {
@@ -454,10 +476,10 @@ const server = http.createServer(async (req, res) => {
     }
     // Owner resets a staff member's password (confirmed with the owner's own password).
     if ((m = p.match(/^\/api\/staff\/(\d+)\/password$/)) && method === 'POST') {
+      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can set staff passwords' });
       const body = await readBody(req);
       const next = String(body.newPassword || '');
       if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
-      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
       const target = db.prepare('SELECT * FROM staff WHERE id = ?').get(Number(m[1]));
       if (!target) return sendJSON(res, 404, { error: 'no such staff member' });
       db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(next, target.id);

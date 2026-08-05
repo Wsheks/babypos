@@ -165,6 +165,13 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,
+  username   TEXT,
+  role       TEXT,
+  created_at TEXT
+);
 `);
 
 // ---------------------------------------------------------------

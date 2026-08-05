@@ -538,8 +538,10 @@ const money = n => n.toLocaleString('en-KE');
 
 // Talk to the backend. Every mutating action goes through here so the
 // shop's data lives on the server and survives a refresh.
+let AUTH_TOKEN = localStorage.getItem('babypos_token') || '';
 async function api(path, method='GET', body){
   const opts = { method, headers:{} };
+  if(AUTH_TOKEN) opts.headers['X-Auth-Token']=AUTH_TOKEN;
   if(body!==undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
   const res = await fetch(path, opts);
   if(!res.ok){ let msg='Request failed'; try{ const j=await res.json(); msg=j.error||msg; }catch(e){} throw new Error(msg); }
@@ -661,6 +663,7 @@ async function doLogin(){
   try{
     const r=await api('/api/login','POST',{username,password});
     currentUser=r.user; loginError=''; loginUserVal='';
+    AUTH_TOKEN=r.token||''; if(AUTH_TOKEN) localStorage.setItem('babypos_token',AUTH_TOKEN);
     try{ localStorage.setItem('babypos_user', JSON.stringify(currentUser)); }catch(e){}
     const first=allowedNav()[0]; view = first?first.key:'sell';
     render();
@@ -1134,13 +1137,12 @@ function settings(){
         <div class="field" style="padding:0"><label>Username (for login)</label><input id="ns-username" placeholder="e.g. mary" autocapitalize="none"></div>
         <div class="field" style="padding:0"><label>Role</label><select id="ns-role" class="sel" style="padding:12px 14px">${ROLES.map(r=>`<option>${r.n}</option>`).join('')}</select></div>
         <div class="field" style="padding:0"><label>Password</label>${pwInput('ns-pass')}</div>
-        <div class="field" style="padding:0;grid-column:1 / -1"><label>Your owner password (to confirm)</label>${pwInput('ns-owner')}</div>
       </div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn green sm" data-staffaddsave>Add to team</button><button class="btn sm" data-staffaddcancel>Cancel</button></div></div></div>`:''}
       ${STAFF_LIST.map(s=>`
         <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${s.c||'#ec7060'}">${(s.name||'?')[0]}</div><div><div class="t">${s.name}</div><div class="d">${s.role} · ${s.username||''}</div></div></div><div class="val" style="gap:8px;flex-wrap:wrap;justify-content:flex-end">${can(9)?`<button class="btn sm" data-staffpw="${s.id}">Set password</button><button class="btn sm" data-staffdel="${s.id}" style="color:var(--stop)">Remove</button>`:'<span style="color:var(--mut);font-size:12.5px">Owner only</span>'}</div></div>
-        ${staffPwEdit===s.id?`<div class="set-row" style="background:#fffdf7"><div style="flex:1;min-width:0"><div class="field" style="padding:0 0 10px"><label>New password for ${s.name}</label>${pwInput('spw-new')}</div><div class="field" style="padding:0"><label>Your owner password (to confirm)</label>${pwInput('spw-owner')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn green sm" data-staffpwsave="${s.id}">Save</button><button class="btn sm" data-staffpwcancel>Cancel</button></div></div>`:''}
-        ${staffDel===s.id?`<div class="set-row" style="background:#fbe9e7"><div style="flex:1;min-width:0"><div class="t">Remove ${s.name} from the team?</div><div class="field" style="padding:8px 0 0"><label>Your owner password (to confirm)</label>${pwInput('del-owner')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn sm" data-staffdelsave="${s.id}" style="background:var(--stop);border-color:var(--stop);color:#fff">Remove</button><button class="btn sm" data-staffdelcancel>Cancel</button></div></div>`:''}`).join('')}
-      <div style="padding:14px 20px;font-size:12.5px;color:var(--mut);font-weight:600">Adding, removing, or changing a staff password each need your owner password to confirm.</div>
+        ${staffPwEdit===s.id?`<div class="set-row" style="background:#fffdf7"><div style="flex:1;min-width:0"><div class="field" style="padding:0"><label>New password for ${s.name}</label>${pwInput('spw-new')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn green sm" data-staffpwsave="${s.id}">Save</button><button class="btn sm" data-staffpwcancel>Cancel</button></div></div>`:''}
+        ${staffDel===s.id?`<div class="set-row" style="background:#fbe9e7"><div style="flex:1;min-width:0"><div class="t">Remove ${s.name} from the team?</div><div class="d">This cannot be undone.</div></div><div class="val" style="gap:8px"><button class="btn sm" data-staffdelsave="${s.id}" style="background:var(--stop);border-color:var(--stop);color:#fff">Yes, remove</button><button class="btn sm" data-staffdelcancel>Cancel</button></div></div>`:''}`).join('')}
+      <div style="padding:14px 20px;font-size:12.5px;color:var(--mut);font-weight:600">Only the owner sees these controls. Changes take effect straight away.</div>
     </div>
     <div class="panel">
       <div class="pt"><h3>Running the shop</h3></div>
@@ -1471,15 +1473,15 @@ screen.addEventListener('click',async e=>{
   // settings: add a new staff member
   const sadd=e.target.closest('[data-staffadd]'); if(sadd){ staffAdd=true; staffPwEdit=null; staffDel=null; render(); return; }
   const saddc=e.target.closest('[data-staffaddcancel]'); if(saddc){ staffAdd=false; render(); return; }
-  const sadds=e.target.closest('[data-staffaddsave]'); if(sadds){ const g=id=>(document.getElementById(id)||{}).value||''; const name=g('ns-name').trim(), username=g('ns-username').trim(), role=g('ns-role'), password=g('ns-pass'), ownerPassword=g('ns-owner'); if(!name||!username||!role){ toast('Name, username and role are needed',true); return; } if(password.length<4){ toast('Password must be at least 4 characters',true); return; } const rc=(ROLES.find(r=>r.n===role)||{}).c||'#ec7060'; try{ const r=await api('/api/staff','POST',{name,username,role,password,color:rc,ownerPassword}); STAFF_LIST=r.staff; staffAdd=false; toast('Added '+r.added); render(); }catch(err){ toast(err.message||'Could not add the person',true); } return; }
+  const sadds=e.target.closest('[data-staffaddsave]'); if(sadds){ const g=id=>(document.getElementById(id)||{}).value||''; const name=g('ns-name').trim(), username=g('ns-username').trim(), role=g('ns-role'), password=g('ns-pass'); if(!name||!username||!role){ toast('Name, username and role are needed',true); return; } if(password.length<4){ toast('Password must be at least 4 characters',true); return; } const rc=(ROLES.find(r=>r.n===role)||{}).c||'#ec7060'; try{ const r=await api('/api/staff','POST',{name,username,role,password,color:rc}); STAFF_LIST=r.staff; staffAdd=false; toast('Added '+r.added); render(); }catch(err){ toast(err.message||'Could not add the person',true); } return; }
   // settings: remove a staff member
   const sdel=e.target.closest('[data-staffdel]'); if(sdel){ staffDel=+sdel.dataset.staffdel; staffPwEdit=null; render(); return; }
   const sdelc=e.target.closest('[data-staffdelcancel]'); if(sdelc){ staffDel=null; render(); return; }
-  const sdels=e.target.closest('[data-staffdelsave]'); if(sdels){ const id=+sdels.dataset.staffdelsave; const ownerPassword=(document.getElementById('del-owner')||{}).value||''; try{ const r=await api('/api/staff/'+id,'DELETE',{ownerPassword}); STAFF_LIST=r.staff; staffDel=null; toast('Removed '+(r.removed||'that person')); render(); }catch(err){ toast(err.message||'Could not remove',true); } return; }
+  const sdels=e.target.closest('[data-staffdelsave]'); if(sdels){ const id=+sdels.dataset.staffdelsave; try{ const r=await api('/api/staff/'+id,'DELETE'); STAFF_LIST=r.staff; staffDel=null; toast('Removed '+(r.removed||'that person')); render(); }catch(err){ toast(err.message||'Could not remove',true); } return; }
   // settings: owner opens / cancels / saves a staff member's password
   const spw=e.target.closest('[data-staffpw]'); if(spw){ staffPwEdit=+spw.dataset.staffpw; staffAdd=false; staffDel=null; render(); return; }
   const spwc=e.target.closest('[data-staffpwcancel]'); if(spwc){ staffPwEdit=null; render(); return; }
-  const spws=e.target.closest('[data-staffpwsave]'); if(spws){ const id=+spws.dataset.staffpwsave; const nw=(document.getElementById('spw-new')||{}).value||''; const op=(document.getElementById('spw-owner')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ const r=await api('/api/staff/'+id+'/password','POST',{newPassword:nw,ownerPassword:op}); staffPwEdit=null; toast('Password set for '+(r.name||'that person')); render(); }catch(err){ toast(err.message||'Could not set the password',true); } return; }
+  const spws=e.target.closest('[data-staffpwsave]'); if(spws){ const id=+spws.dataset.staffpwsave; const nw=(document.getElementById('spw-new')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ const r=await api('/api/staff/'+id+'/password','POST',{newPassword:nw}); staffPwEdit=null; toast('Password set for '+(r.name||'that person')); render(); }catch(err){ toast(err.message||'Could not set the password',true); } return; }
   const sw=e.target.closest('.switch'); if(sw){
     const key=sw.dataset.swkey;
     if(key){ const now=!sw.classList.contains('on'); SETTINGS[key]=now?'1':'0'; try{ await api('/api/settings','PATCH',{[key]: now?'1':'0'}); }catch(err){ SETTINGS[key]=now?'0':'1'; toast('Could not save the setting',true); } render(); }
@@ -1508,7 +1510,7 @@ screen.addEventListener('keydown',e=>{
 lockEl.addEventListener('submit',e=>{ if(e.target.id==='loginForm'){ e.preventDefault(); doLogin(); } });
 // Show/hide password eye buttons (login and settings)
 document.addEventListener('click',e=>{ const eye=e.target.closest('[data-eye]'); if(!eye) return; const inp=document.getElementById(eye.dataset.eye); if(!inp) return; if(inp.type==='password'){ inp.type='text'; eye.textContent='Hide'; } else { inp.type='password'; eye.textContent='Show'; } });
-document.getElementById('signOut').addEventListener('click',()=>{ currentUser=null; loginUserVal=''; loginError=''; try{ localStorage.removeItem('babypos_user'); }catch(e){} view='sell'; resetPay(); showParked=false; render(); });
+document.getElementById('signOut').addEventListener('click',()=>{ try{ api('/api/logout','POST'); }catch(e){} currentUser=null; loginUserVal=''; loginError=''; try{ localStorage.removeItem('babypos_user'); localStorage.removeItem('babypos_token'); }catch(e){} AUTH_TOKEN=''; view='sell'; resetPay(); showParked=false; render(); });
 
 // hardware print preview
 document.getElementById('hwmodal').addEventListener('click',e=>{
