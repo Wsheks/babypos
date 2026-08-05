@@ -423,7 +423,35 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { count: arr.length, at: getSetting('catalogue_published_at'), path: finalPath });
     }
 
+    // Owner adds a new staff member (confirmed with the owner's own password).
+    if (p === '/api/staff' && method === 'POST') {
+      const body = await readBody(req);
+      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
+      const name = String(body.name || '').trim();
+      const username = String(body.username || '').trim().toLowerCase();
+      const role = String(body.role || '').trim();
+      const password = String(body.password || '');
+      if (!name || !username || !role) return sendJSON(res, 400, { error: 'Name, username and role are required' });
+      if (password.length < 4) return sendJSON(res, 400, { error: 'Password must be at least 4 characters' });
+      if (db.prepare('SELECT 1 FROM staff WHERE lower(username) = ?').get(username)) return sendJSON(res, 400, { error: 'That username is already taken' });
+      db.prepare('INSERT INTO staff (name, username, role, password, color) VALUES (?, ?, ?, ?, ?)')
+        .run(name, username, role, password, body.color || '#ec7060');
+      return sendJSON(res, 200, { staff: allStaffPublic(), added: name });
+    }
+
     let m;
+    // Owner removes a staff member (confirmed with the owner's own password).
+    if ((m = p.match(/^\/api\/staff\/(\d+)$/)) && method === 'DELETE') {
+      const body = await readBody(req);
+      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
+      const target = db.prepare('SELECT * FROM staff WHERE id = ?').get(Number(m[1]));
+      if (!target) return sendJSON(res, 404, { error: 'no such staff member' });
+      if (target.role === 'Owner' && db.prepare("SELECT COUNT(*) AS c FROM staff WHERE role = 'Owner'").get().c <= 1) {
+        return sendJSON(res, 400, { error: 'You cannot remove the only owner' });
+      }
+      db.prepare('DELETE FROM staff WHERE id = ?').run(target.id);
+      return sendJSON(res, 200, { staff: allStaffPublic(), removed: target.name });
+    }
     // Owner resets a staff member's password (confirmed with the owner's own password).
     if ((m = p.match(/^\/api\/staff\/(\d+)\/password$/)) && method === 'POST') {
       const body = await readBody(req);
