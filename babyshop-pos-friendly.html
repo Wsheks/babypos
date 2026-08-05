@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Babyshop POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#faf6ee; --card:#ffffff; --ink:#3a322e; --ink2:#6f645b; --mut:#98897d;
+  --line:#ede3d4; --line2:#f3ecdf;
+  --sun:#f2a12a; --sun-d:#e08d10; --sun-t:#fdefd7;
+  --mpesa:#12995a; --mpesa-t:#e6f5ec;
+  --blue:#2f6be6; --blue-t:#e7effc;
+  --coral:#ec7060; --coral-t:#fdecea;
+  --ok:#2c9a67; --warn:#c07a12; --warn-t:#fbf0da; --stop:#c94236; --stop-t:#fbe9e7;
+  --r:20px; --r-s:14px;
+  --shadow:0 1px 2px rgba(58,50,46,.04),0 6px 16px rgba(58,50,46,.06); --shadow-l:0 10px 30px rgba(58,50,46,.14),0 2px 6px rgba(58,50,46,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:radial-gradient(1100px 520px at 100% -8%,#fdf6e9,transparent 60%),radial-gradient(900px 500px at -10% 0%,#fbeee0,transparent 55%),var(--paper);background-attachment:fixed;color:var(--ink);font-family:Nunito,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
+:focus-visible{outline:3px solid #f6c46b;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------------- app frame ---------------- */
+.app{display:grid;grid-template-columns:112px 1fr;min-height:100vh;max-width:1440px;margin:0 auto}
+.rail{background:var(--card);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:8px;position:sticky;top:0;height:100vh}
+.logo{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:16px}
+.logo .mk{width:52px;height:52px;border-radius:16px;background:var(--sun);display:grid;place-items:center;box-shadow:0 4px 0 var(--sun-d)}
+.logo .mk svg{width:30px;height:30px}
+.logo .wm{font-family:"Baloo 2";font-weight:700;font-size:13px;text-align:center;line-height:1.15;color:var(--ink)}
+#navlist{display:flex;flex-direction:column;gap:7px}
+.navbtn{border:0;background:none;border-radius:16px;padding:12px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:7px;width:100%;color:var(--ink2);font-weight:700;font-size:11.5px;transition:background .16s,color .16s,box-shadow .18s,transform .12s}
+.navbtn svg{width:25px;height:25px;transition:transform .14s}
+.navbtn:hover{background:var(--sun-t);color:var(--ink)}
+.navbtn:hover svg{transform:translateY(-2px)}
+.navbtn:active{transform:translateY(1px)}
+.navbtn.on{background:linear-gradient(180deg,#f6ad3c,var(--sun));color:#fff;box-shadow:0 8px 18px rgba(224,141,16,.34)}
+.navbtn.on:hover{background:linear-gradient(180deg,#f6ad3c,var(--sun));color:#fff}
+.navbtn.on:hover svg{transform:none}
+.rail .spacer{flex:1}
+.helpbtn{border:1px solid var(--line);background:var(--card);border-radius:var(--r-s);padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink2);font-weight:700;font-size:11px}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:16px;padding:20px 30px 4px;flex-wrap:wrap}
+.hello h1{margin:0;font-size:clamp(22px,2.4vw,27px);font-weight:800;letter-spacing:-.01em}
+.hello p{margin:2px 0 0;color:var(--ink2);font-size:14px}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.shift{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-size:13px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.shift .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.me{display:flex;align-items:center;gap:10px}
+.me .av{width:42px;height:42px;border-radius:50%;background:var(--coral);color:#fff;display:grid;place-items:center;font-family:"Baloo 2";font-weight:700;font-size:16px}
+.me .nm{font-weight:800;font-size:14px}
+.me .rl{font-size:12px;color:var(--mut)}
+.screen{padding:14px 30px 40px;flex:1}
+
+/* ---------------- SELL ---------------- */
+.sell{display:grid;grid-template-columns:1fr 396px;gap:22px;align-items:start}
+.searchwrap{position:relative;margin-bottom:16px}
+.searchwrap svg{position:absolute;left:18px;top:50%;transform:translateY(-50%);width:22px;height:22px;color:var(--mut)}
+.search{width:100%;border:2px solid var(--line);background:var(--card);border-radius:16px;padding:16px 16px 16px 50px;font:inherit;font-size:16px;font-weight:600}
+.search::placeholder{color:var(--mut);font-weight:500}
+.search:focus{border-color:var(--sun);outline:none}
+.chips{display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:10px 17px;font-weight:700;font-size:13.5px;color:var(--ink2);box-shadow:0 1px 2px rgba(58,50,46,.04);transition:border-color .12s,transform .1s,box-shadow .15s}
+.chip:hover{border-color:var(--sun)}
+.chip:active{transform:translateY(1px)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 4px 12px rgba(58,50,46,.2)}
+.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;text-align:left;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
+.pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
+.pcard .pic{height:88px;border-radius:12px;background:linear-gradient(150deg,#fbeecf,#f7e3e0);display:grid;place-items:center;color:#d9b98a}
+.pcard .pic svg{width:34px;height:34px;opacity:.7}
+.pcard .nm{font-weight:800;font-size:14px;line-height:1.28}
+.pcard .age{font-size:12.5px;color:var(--mut);font-weight:600}
+.pcard .foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto}
+.pcard .pr{font-family:"Baloo 2";font-weight:700;font-size:17px}
+.pcard .stk{font-size:11.5px;font-weight:700;color:var(--ok);background:#eaf6ef;border-radius:999px;padding:3px 9px}
+.pcard .stk.low{color:var(--warn);background:var(--warn-t)}
+.pcard .add{width:34px;height:34px;border-radius:50%;background:var(--sun-t);color:var(--sun-d);border:0;font-size:22px;line-height:1;display:grid;place-items:center;font-family:"Baloo 2"}
+.pcard:hover .add{background:var(--sun);color:#fff}
+
+/* cart */
+.cart{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);position:sticky;top:18px;overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 40px)}
+.cart .ch{padding:18px 20px 14px;border-bottom:1px solid var(--line2)}
+.cart .ch .row{display:flex;align-items:center;justify-content:space-between}
+.cart .ch h3{margin:0;font-size:18px;font-weight:800}
+.cart .ch .clear{border:0;background:none;color:var(--mut);font-weight:700;font-size:13px;text-decoration:underline}
+.who{display:flex;align-items:center;gap:11px;margin-top:12px;background:var(--coral-t);border-radius:14px;padding:10px 13px}
+.who .ic{width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--coral)}
+.who .ic svg{width:19px;height:19px}
+.who .nm{font-weight:800;font-size:14px}
+.who .dt{font-size:12px;color:var(--ink2);margin-top:1px}
+.who .chg{margin-left:auto;border:0;background:#fff;color:var(--coral);font-weight:800;font-size:12.5px;border-radius:999px;padding:7px 12px}
+.lines{flex:1;overflow-y:auto;padding:8px 20px}
+.line{display:grid;grid-template-columns:1fr auto;gap:6px;padding:14px 0;border-bottom:1px solid var(--line2)}
+.line:last-child{border-bottom:0}
+.line .nm{font-weight:700;font-size:14.5px;line-height:1.25}
+.line .age{font-size:12px;color:var(--mut);margin-top:2px;font-weight:600}
+.line .pr{font-family:"Baloo 2";font-weight:700;font-size:16px;text-align:right}
+.stepper{display:inline-flex;align-items:center;gap:0;background:var(--paper);border:1px solid var(--line);border-radius:999px;margin-top:9px;overflow:hidden}
+.stepper button{width:32px;height:32px;border:0;background:none;font-size:19px;color:var(--ink2);font-family:"Baloo 2";display:grid;place-items:center}
+.stepper button:hover{background:var(--sun-t);color:var(--sun-d)}
+.stepper .q{min-width:30px;text-align:center;font-weight:800;font-size:14px}
+.empty{padding:40px 24px;text-align:center;color:var(--mut)}
+.empty .big{width:70px;height:70px;border-radius:50%;background:var(--sun-t);display:grid;place-items:center;margin:0 auto 14px;color:var(--sun-d)}
+.empty .big svg{width:34px;height:34px}
+.empty p{font-weight:700;color:var(--ink2);margin:0 0 4px}
+.empty span{font-size:13px}
+.cart .foot{border-top:1px solid var(--line2);padding:16px 20px 18px;background:linear-gradient(#fff,#fffdf9)}
+.trow{display:flex;justify-content:space-between;font-size:14px;color:var(--ink2);font-weight:600;padding:3px 0}
+.grand{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 4px}
+.grand span{font-weight:700;color:var(--ink2)}
+.grand b{font-family:"Baloo 2";font-size:34px;font-weight:800}
+.vat{font-size:12px;color:var(--mut);font-weight:600;margin-bottom:14px}
+.pay-btn{width:100%;border:0;border-radius:16px;background:var(--mpesa);color:#fff;padding:18px;font-family:"Baloo 2";font-size:19px;font-weight:700;box-shadow:0 4px 0 #0c7343;display:flex;align-items:center;justify-content:center;gap:10px}
+.pay-btn:hover{filter:brightness(1.04)}
+.pay-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0c7343}
+.pay-btn svg{width:22px;height:22px}
+.hold{width:100%;margin-top:9px;border:1.5px solid var(--line);background:#fff;color:var(--ink2);border-radius:14px;padding:13px;font-weight:800;font-size:14px}
+
+/* ---------------- page header (shared) ---------------- */
+.phead{margin-bottom:22px}
+.phead h2{margin:0;font-size:clamp(21px,2.2vw,25px);font-weight:800;letter-spacing:-.01em}
+.phead p{margin:5px 0 0;color:var(--ink2);font-size:14.5px;max-width:64ch;line-height:1.6}
+
+/* ---------------- CHECKOUT ---------------- */
+.co{display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start}
+.co-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}
+.co-card h3{margin:0 0 4px;font-size:18px;font-weight:800}
+.co-card .hint{color:var(--ink2);font-size:13.5px;margin:0 0 18px}
+.methods{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.method{border:2px solid var(--line);background:var(--card);border-radius:16px;padding:16px;display:flex;align-items:center;gap:13px;text-align:left}
+.method .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;flex:none}
+.method .ic svg{width:24px;height:24px}
+.method .t{font-weight:800;font-size:15px}
+.method .d{font-size:12px;color:var(--mut);margin-top:2px;font-weight:600}
+.method.mpesa .ic{background:var(--mpesa-t);color:var(--mpesa)}
+.method.card .ic{background:var(--blue-t);color:var(--blue)}
+.method.cash .ic{background:var(--sun-t);color:var(--sun-d)}
+.method.split .ic{background:#efeafc;color:#7159c6}
+.method.on{border-color:var(--mpesa);background:var(--mpesa-t)}
+.method.card.on{border-color:var(--blue);background:var(--blue-t)}
+.method:hover{border-color:var(--ink2)}
+
+.mpesa-flow{margin-top:20px;text-align:center;padding:8px 0}
+.phone-il{width:130px;height:150px;margin:0 auto 18px;position:relative}
+.phone-il .body{position:absolute;inset:0;border:5px solid var(--ink);border-radius:22px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:8px}
+.phone-il .ring{position:absolute;inset:-14px;border-radius:34px;border:3px solid var(--mpesa);animation:ring 1.9s ease-out infinite}
+@keyframes ring{0%{transform:scale(.92);opacity:.55}100%{transform:scale(1.12);opacity:0}}
+.phone-il .stk-ic{width:38px;height:38px;border-radius:10px;background:var(--mpesa-t);display:grid;place-items:center;color:var(--mpesa)}
+.phone-il .stk-ic svg{width:22px;height:22px}
+.phone-il .tt{font-size:10px;color:var(--ink2);font-weight:700;line-height:1.4}
+.wait-t{font-family:"Baloo 2";font-size:21px;font-weight:700}
+.wait-s{color:var(--ink2);font-size:14px;margin-top:6px;line-height:1.55;font-weight:600}
+.wait-s b{color:var(--mpesa)}
+.co-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.co-actions button{border:1.5px solid var(--line);background:#fff;color:var(--ink2);border-radius:12px;padding:12px 18px;font-weight:800;font-size:13.5px}
+.co-actions button:hover{border-color:var(--ink2)}
+.co-actions .primary{background:var(--mpesa);border-color:var(--mpesa);color:#fff;box-shadow:0 3px 0 #0c7343}
+
+.tip{background:var(--sun-t);border-radius:14px;padding:14px 16px;display:flex;gap:12px;margin-top:20px;align-items:flex-start}
+.tip .ic{color:var(--sun-d);flex:none}.tip .ic svg{width:22px;height:22px}
+.tip p{margin:0;font-size:13.5px;color:#7a5713;font-weight:600;line-height:1.5}
+.tip b{font-weight:800}
+
+.co-summary .ln{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line2);font-size:13.5px}
+.co-summary .ln:last-of-type{border-bottom:0}
+.co-summary .ln .q{color:var(--mut);font-size:12px;font-weight:600}
+.co-summary .ln b{font-weight:700}
+.co-total{border-top:2px solid var(--line);margin-top:6px;padding-top:14px}
+.co-total .g{display:flex;justify-content:space-between;align-items:baseline}
+.co-total .g b{font-family:"Baloo 2";font-size:30px;font-weight:800}
+.co-total .paid{display:flex;justify-content:space-between;color:var(--ink2);font-weight:700;font-size:13.5px;margin-top:8px}
+.co-total .due{display:flex;justify-content:space-between;color:var(--stop);font-weight:800;font-size:14px;margin-top:4px}
+
+/* ---------------- generic cards / tables ---------------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:22px}
+.stat{position:relative;background:linear-gradient(180deg,#ffffff,#fffdf8);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;box-shadow:var(--shadow);overflow:hidden;transition:transform .15s,box-shadow .2s}
+.stat::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--sun),#f7c979)}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-l)}
+.stat .l{font-size:11.5px;color:var(--ink2);font-weight:800;text-transform:uppercase;letter-spacing:.055em}
+.stat .v{font-family:"Baloo 2";font-size:29px;font-weight:800;margin-top:7px;letter-spacing:-.01em}
+.stat .v.sm{font-size:18px;padding-top:6px}
+.stat-btn{cursor:pointer;font:inherit;color:inherit;text-align:left;display:block;width:100%}
+.stat-btn:hover{border-color:var(--sun);transform:translateY(-2px)}
+.stat-btn.on{border-color:var(--sun);box-shadow:var(--shadow-l),0 0 0 3px var(--sun-t)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.panel .pt{padding:17px 20px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:12px}
+.panel .pt h3{margin:0;font-size:17px;font-weight:800;position:relative;padding-left:14px}
+.panel .pt h3::before{content:"";position:absolute;left:0;top:52%;transform:translateY(-50%);width:5px;height:17px;border-radius:3px;background:linear-gradient(180deg,var(--sun),var(--sun-d))}
+.panel .pt .badge{margin-left:auto;background:var(--sun-t);color:var(--sun-d);font-weight:800;font-size:12.5px;border-radius:999px;padding:5px 12px}
+
+.list{padding:6px 0}
+.item-row{display:grid;grid-template-columns:auto 1fr auto;gap:15px;padding:16px 20px;border-bottom:1px solid var(--line2);align-items:center;transition:background .12s}
+.item-row:hover{background:#fffdf8}
+.item-row:last-child{border-bottom:0}
+.thumb{width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#fbeecf,#f7e3e0);display:grid;place-items:center;color:#d9b98a}
+.thumb svg{width:24px;height:24px;opacity:.7}
+.ir-nm{font-weight:800;font-size:15px}
+.ir-sub{font-size:13px;color:var(--ink2);margin-top:2px;font-weight:600}
+.ir-right{text-align:right;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-weight:800;font-size:12.5px}
+.pill.ok{background:#eaf6ef;color:var(--ok)}
+.pill.warn{background:var(--warn-t);color:var(--warn)}
+.pill.stop{background:var(--stop-t);color:var(--stop)}
+.pill.info{background:var(--blue-t);color:var(--blue)}
+.pill.new{background:#efeafc;color:#7159c6}
+
+.btn{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:12px;padding:11px 17px;font-weight:800;font-size:14px}
+.btn:hover{border-color:var(--ink2)}
+.btn.green{background:var(--mpesa);border-color:var(--mpesa);color:#fff;box-shadow:0 3px 0 #0c7343}
+.btn.sun{background:var(--sun);border-color:var(--sun);color:#fff;box-shadow:0 3px 0 var(--sun-d)}
+.btn.ghost{background:none;border-color:transparent;color:var(--ink2);text-decoration:underline;padding:11px 6px}
+.btn.sm{padding:9px 14px;font-size:13px}
+.btn.green:active,.btn.sun:active{transform:translateY(2px)}
+
+/* accept stock quantity confirm */
+.count-box{display:inline-flex;align-items:center;background:var(--paper);border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.count-box button{width:38px;height:40px;border:0;background:none;font-size:20px;font-family:"Baloo 2";color:var(--ink2)}
+.count-box button:hover{background:var(--sun-t);color:var(--sun-d)}
+.count-box .c{min-width:44px;text-align:center;font-weight:800;font-size:16px;font-family:"Baloo 2"}
+.match{font-size:12.5px;font-weight:700;color:var(--ok);margin-top:6px}
+.match.off{color:var(--warn)}
+
+/* ---------------- SETTINGS ---------------- */
+.set-grid{display:grid;grid-template-columns:230px 1fr;gap:22px;align-items:start}
+.set-nav{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px;box-shadow:var(--shadow);position:sticky;top:18px}
+.set-nav button{width:100%;text-align:left;border:0;background:none;border-radius:12px;padding:13px 15px;font-weight:800;font-size:14.5px;color:var(--ink2);display:flex;align-items:center;gap:11px}
+.set-nav button svg{width:20px;height:20px}
+.set-nav button:hover{background:var(--paper)}
+.set-nav button.on{background:var(--sun-t);color:var(--ink)}
+
+.rights-tbl{width:100%;border-collapse:collapse}
+.rights-tbl th{text-align:center;font-size:12px;font-weight:800;color:var(--ink2);padding:14px 8px;border-bottom:1px solid var(--line)}
+.rights-tbl th:first-child{text-align:left;padding-left:20px;width:44%}
+.rights-tbl td{padding:14px 8px;border-bottom:1px solid var(--line2);text-align:center}
+.rights-tbl td:first-child{text-align:left;padding-left:20px;font-weight:700;font-size:14px}
+.rights-tbl tr:last-child td{border-bottom:0}
+.rights-tbl .rl-head{display:flex;flex-direction:column;align-items:center;gap:6px}
+.rights-tbl .rl-head .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:"Baloo 2";font-weight:700;font-size:13px}
+.money-note{font-size:11px;color:var(--warn);font-weight:800;display:inline-flex;gap:4px;align-items:center;margin-left:6px}
+
+.switch{width:50px;height:29px;border-radius:999px;background:#dcd2c4;position:relative;border:0;flex:none;transition:background .16s}
+.switch:after{content:"";position:absolute;top:3px;left:3px;width:23px;height:23px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.16s}
+.switch.on{background:var(--mpesa)}
+.switch.on:after{left:24px}
+
+.set-row{display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid var(--line2)}
+.set-row:last-child{border-bottom:0}
+.set-row .t{font-weight:800;font-size:14.5px}
+.set-row .d{font-size:13px;color:var(--ink2);margin-top:2px;font-weight:600}
+.set-row .val{margin-left:auto;font-weight:800;color:var(--ink2);font-size:13.5px;display:flex;align-items:center;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px;padding:14px 20px}
+.field label{font-weight:800;font-size:13px;color:var(--ink2)}
+.field input{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font:inherit;font-weight:700;font-size:15px;background:#fff}
+.field input:focus{border-color:var(--sun);outline:none}
+
+/* help drawer */
+.drawer-bg{position:fixed;inset:0;background:rgba(58,50,46,.4);opacity:0;pointer-events:none;transition:.2s;z-index:60}
+.drawer-bg.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:88vw;background:var(--card);box-shadow:-10px 0 40px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .24s;z-index:61;padding:24px;overflow-y:auto}
+.drawer.show{transform:translateX(0)}
+.drawer h3{margin:0 0 6px;font-size:20px;font-weight:800}
+.drawer .close{position:absolute;top:18px;right:18px;border:0;background:var(--paper);width:36px;height:36px;border-radius:50%;font-size:18px}
+.drawer .qa{border-top:1px solid var(--line2);padding:15px 0}
+.drawer .qa .q{font-weight:800;font-size:14.5px;margin-bottom:5px}
+.drawer .qa .a{font-size:13.5px;color:var(--ink2);line-height:1.55}
+
+/* ---------------- checkout step (opens from the sale) ---------------- */
+.backbar{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.backbar .back{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:9px 16px 9px 12px;font-weight:800;font-size:14px;color:var(--ink2)}
+.backbar .back svg{width:18px;height:18px}
+.backbar .back:hover{background:var(--sun-t);color:var(--ink)}
+.paysteps{display:flex;gap:10px;margin:2px 0 20px}
+.paysteps .s{display:flex;align-items:center;gap:9px}
+.paysteps .n{width:26px;height:26px;border-radius:50%;background:var(--line);color:var(--mut);display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.paysteps .lb{font-weight:800;font-size:13.5px;color:var(--mut)}
+.paysteps .arw{color:var(--line);align-self:center}
+.paysteps .s.done .n{background:var(--mpesa);color:#fff}
+.paysteps .s.done .lb{color:var(--ink2)}
+.paysteps .s.now .n{background:var(--sun);color:#fff}
+.paysteps .s.now .lb{color:var(--ink)}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-size:12px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
+.fld input{width:100%;border:2px solid var(--line2);border-radius:12px;padding:14px;font:inherit;font-size:20px;font-weight:800;font-family:"Baloo 2";background:#fff}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.quick button{flex:1;min-width:90px;border:2px solid var(--line2);background:#fff;border-radius:12px;padding:12px 6px;font-weight:800;font-size:14px;color:var(--ink2)}
+.quick button:hover{border-color:var(--ink2)}
+.changebox{display:flex;justify-content:space-between;align-items:center;border-radius:13px;padding:15px;font-weight:800;font-size:15px}
+.paid-wrap{text-align:center;max-width:460px;margin:0 auto;padding:20px 10px 30px}
+.paid-circle{width:92px;height:92px;border-radius:50%;background:var(--mpesa-t);display:grid;place-items:center;margin:0 auto 16px}
+.paid-circle svg{width:48px;height:48px;color:var(--mpesa)}
+.paid-amt{font-family:"Baloo 2";font-weight:800;font-size:36px;margin:4px 0}
+.paid-card{background:var(--card);border:1px solid var(--line);border-radius:16px;text-align:left;padding:6px 18px;margin:18px 0}
+.paid-card .r{display:flex;align-items:center;gap:11px;padding:13px 0;font-weight:700}
+.paid-card .r:not(:last-child){border-bottom:1px solid var(--line2)}
+.paid-card .r svg{width:20px;height:20px;color:var(--mut);flex:none}
+.bigbtn{width:100%;border:0;border-radius:14px;padding:17px;font-family:"Baloo 2";font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:9px;color:#fff;background:var(--mpesa);box-shadow:0 4px 0 #0c7a47}
+.bigbtn:active{transform:translateY(2px);box-shadow:0 2px 0 #0c7a47}
+.bigbtn.sun{background:var(--sun);box-shadow:0 4px 0 var(--sun-d)}
+.bigbtn.sun:active{box-shadow:0 2px 0 var(--sun-d)}
+.bigbtn.blue{background:var(--blue);box-shadow:0 4px 0 #2352b8}
+.bigbtn svg{width:20px;height:20px}
+.bigbtn.ghost{background:#fff;color:var(--ink2);border:2px solid var(--line2);box-shadow:none;font-size:15px}
+.bigbtn[disabled]{opacity:.45;pointer-events:none}
+
+/* ---------------- login / lock ---------------- */
+.lock{position:fixed;inset:0;z-index:200;background:linear-gradient(165deg,#fbf5ec,#efe4d1);display:none;align-items:center;justify-content:center;padding:20px}
+.lock.show{display:flex}
+.lock-card{background:var(--card);border-radius:26px;box-shadow:var(--shadow-l);width:100%;max-width:430px;padding:26px 24px 28px;text-align:center}
+.lock-mk{width:58px;height:58px;border-radius:17px;background:var(--sun);display:grid;place-items:center;margin:0 auto 12px;box-shadow:0 4px 0 var(--sun-d)}
+.lock-mk svg{width:32px;height:32px}
+.lock h2{font-size:23px}
+.lock .sub{color:var(--ink2);font-weight:600;font-size:14px;margin:2px 0 6px}
+.staff-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:18px}
+.staff{display:flex;align-items:center;gap:11px;border:2px solid var(--line2);border-radius:15px;padding:12px;background:#fff;text-align:left}
+.staff:hover{border-color:var(--sun);background:var(--sun-t)}
+.staff .av{width:40px;height:40px;border-radius:50%;color:#fff;display:grid;place-items:center;font-family:"Baloo 2";font-weight:700;font-size:15px;flex:none}
+.staff .nm{font-weight:800;font-size:14px}
+.staff .rl{font-size:12px;color:var(--mut)}
+.pin-who{display:flex;align-items:center;gap:11px;justify-content:center;margin:14px 0 4px}
+.pin-who .av{width:44px;height:44px;border-radius:50%;color:#fff;display:grid;place-items:center;font-family:"Baloo 2";font-weight:700;font-size:16px}
+.pin-dots{display:flex;gap:13px;justify-content:center;margin:16px 0}
+.pin-dots i{width:15px;height:15px;border-radius:50%;background:var(--line2)}
+.pin-dots i.on{background:var(--ink)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto}
+.keypad button{padding:15px 0;border:2px solid var(--line2);background:#fff;border-radius:14px;font-family:"Baloo 2";font-size:22px;font-weight:700;color:var(--ink)}
+.keypad button:active{background:var(--sun-t)}
+.lock .hint{font-size:12.5px;color:var(--mut);font-weight:600;margin-top:14px}
+.lock .lback{margin-top:14px;border:0;background:none;color:var(--ink2);font-weight:800;font-size:14px}
+.lock.shake .lock-card{animation:shk .3s}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}
+.lockbtn{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px;display:grid;place-items:center;color:var(--ink2)}
+.lockbtn:hover{background:var(--sun-t);color:var(--ink)}
+.lockbtn svg{width:19px;height:19px}
+.login-form{margin-top:20px;text-align:left}
+.login-field{display:flex;flex-direction:column;gap:7px;margin-bottom:15px}
+.login-field label{font-weight:800;font-size:12px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em}
+.login-field input{border:2px solid var(--line);border-radius:13px;padding:15px 15px;font:inherit;font-weight:700;font-size:16px;background:#fff;color:var(--ink)}
+.login-field input::placeholder{color:var(--mut);font-weight:500}
+.login-field input:focus{border-color:var(--sun);outline:none}
+.login-btn{width:100%;margin-top:4px;border:0;border-radius:14px;background:var(--sun);color:#fff;padding:16px;font-family:"Baloo 2";font-weight:700;font-size:18px;box-shadow:0 4px 0 var(--sun-d);display:flex;align-items:center;justify-content:center;gap:9px}
+.login-btn:hover{filter:brightness(1.03)}
+.login-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--sun-d)}
+.login-btn svg{width:20px;height:20px}
+.login-err{background:var(--stop-t);color:var(--stop);font-weight:700;font-size:13.5px;border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center}
+
+/* nav badge */
+.navbtn{position:relative}
+.navbtn .nbadge{position:absolute;top:6px;right:22px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--coral);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 5px rgba(236,112,96,.4)}
+
+/* orders inbox */
+.ord{display:flex;gap:13px;align-items:flex-start;padding:15px;border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:11px}
+.ord .chic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none}
+.ord .chic svg{width:22px;height:22px}
+.ord .body{flex:1;min-width:0}
+.ord .r1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ord .cust{font-weight:800;font-size:15px}
+.ord .meta{font-size:12.5px;color:var(--mut);font-weight:600;margin-top:2px}
+.ord .its{font-size:13px;color:var(--ink2);font-weight:600;margin-top:6px;line-height:1.5}
+.ord .right{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.ord .amt{font-family:"Baloo 2";font-weight:700;font-size:16px}
+.chan{font-weight:800;font-size:11.5px;padding:3px 9px;border-radius:999px}
+.chan.wa{background:#e6f5ec;color:#0f7a44}
+.chan.tt{background:#efe7f7;color:#6c4bb3}
+.pill.new{background:#e7effc;color:#215bb0}
+.pill.packed{background:#fdefd7;color:var(--sun-d)}
+.pill.rider{background:#efe7f7;color:#6c4bb3}
+.pill.delivered{background:#eaf6ef;color:var(--ok)}
+.pill.await{background:#fbe9e7;color:#c0392b}
+
+/* parked sales */
+.parked{background:#fff;border:1px dashed var(--line2);border-radius:15px;padding:6px 14px 12px;margin-bottom:12px}
+.parked .ph{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px}
+.parked .ph h4{font-size:14px}
+.held{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line2)}
+.held .hn{font-weight:800;font-size:13.5px}
+.held .hd{font-size:12px;color:var(--mut);font-weight:600}
+.held .hb{margin-left:auto;display:flex;gap:6px}
+.parkchip{border:1px solid var(--line2);background:#fff;border-radius:999px;padding:6px 12px;font-weight:800;font-size:12.5px;color:var(--ink2);display:inline-flex;align-items:center;gap:6px}
+
+/* discount at checkout */
+.disc{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px}
+.disc button{border:2px solid var(--line2);background:#fff;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;color:var(--ink2)}
+.disc button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.disc-amt{display:flex;align-items:center;gap:9px}
+.disc-amt .ksh{font-weight:800;color:var(--ink2);font-family:"Baloo 2";font-size:15px}
+.disc-amt input{flex:1;min-width:80px;border:2px solid var(--line2);border-radius:12px;padding:13px 14px;font:inherit;font-weight:800;font-family:"Baloo 2";font-size:18px;background:#fff}
+.disc-amt input:focus{border-color:var(--sun);outline:none}
+.disc .lockic{width:13px;height:13px;vertical-align:-2px;margin-left:4px}
+.mgr{background:#fff7e9;border:1px solid #f3d79a;border-radius:13px;padding:14px;margin-bottom:16px}
+.mgr .mt{font-weight:800;font-size:13.5px;color:#9a6206;margin-bottom:8px}
+.mgr input{width:120px;border:2px solid #f0d091;border-radius:10px;padding:10px;font:inherit;font-weight:800;font-family:"Baloo 2";font-size:16px;text-align:center;letter-spacing:4px}
+
+/* ---------------- printers, scanner, devices ---------------- */
+.caps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.cap{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-weight:700;font-size:13px}
+.cap .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.cap.ok .dot{background:var(--ok)}
+.cap.no .dot{background:#d3cab9}
+.cap.no{color:var(--mut)}
+.devcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:12px}
+.devcard .dh{display:flex;align-items:center;gap:12px}
+.devcard .di{width:44px;height:44px;border-radius:12px;background:var(--sun-t);color:var(--sun-d);display:grid;place-items:center;flex:none}
+.devcard .di svg{width:23px;height:23px}
+.devcard h4{font-size:16px}
+.devcard .dsub{font-size:12.5px;color:var(--mut);font-weight:600;margin-top:2px}
+.devcard .drow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.sel{border:2px solid var(--line2);border-radius:11px;padding:10px 12px;font:inherit;font-weight:700;font-size:13.5px;background:#fff;color:var(--ink)}
+.scan-test{display:flex;gap:10px;align-items:center;margin-top:14px}
+.scan-test input{flex:1;border:2px solid var(--line2);border-radius:11px;padding:11px 13px;font:inherit;font-weight:700}
+.laststamp{background:#e7effc;border:1px solid #d1e0fb;border-radius:11px;padding:10px 13px;font-weight:800;font-size:13.5px;color:#215bb0;margin-top:12px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-weight:700;font-size:14px;padding:13px 20px;border-radius:14px;box-shadow:var(--shadow-l);opacity:0;transition:.2s;z-index:300;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.bad{background:#b3271e}
+.hwmodal{position:fixed;inset:0;z-index:210;background:rgba(48,43,63,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.hwmodal.show{display:flex}
+.rcpt-wrap{background:var(--card);border-radius:20px;box-shadow:var(--shadow-l);width:100%;max-width:340px;padding:20px}
+.rcpt-wrap h3{font-size:17px}
+.rcpt{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px;font-family:ui-monospace,"Courier New",monospace;font-size:12px;line-height:1.7;color:#2a2a2a;max-height:56vh;overflow:auto}
+.rcpt .c{text-align:center}
+.rcpt .hr{border-top:1px dashed #bbb;margin:8px 0}
+.rcpt .row{display:flex;justify-content:space-between;gap:8px}
+
+/* ---------------- products, reports ---------------- */
+.recv-banner{display:flex;align-items:center;gap:12px;background:var(--mpesa-t);border:1px solid #bfe5cd;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-weight:700;color:#0c6b40}
+.recv-banner svg{width:22px;height:22px;flex:none}
+.np-form{border:2px solid var(--sun);border-radius:16px;padding:18px;margin-bottom:16px;background:#fffdf7}
+.np-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.np-grid .field{margin:0}
+.np-grid .field input{width:100%}
+.pill.mpesa{background:var(--mpesa-t);color:var(--mpesa)}
+.pill.card{background:var(--blue-t);color:var(--blue)}
+.pill.cash{background:var(--sun-t);color:var(--sun-d)}
+.mbar{display:flex;height:22px;border-radius:11px;overflow:hidden;margin:6px 0 16px;gap:3px;background:var(--line2);padding:0}
+.mbar span{display:block;border-radius:3px}
+.mlegend{display:flex;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:700;color:var(--ink2)}
+.mlegend .d{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.mlegend b{font-family:"Baloo 2";font-weight:700}
+.mfilter{border:1.5px solid transparent;background:none;font:inherit;color:var(--ink2);font-weight:700;font-size:13.5px;border-radius:10px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center}
+.mfilter:hover{border-color:var(--line)}
+.mfilter.on{border-color:var(--sun);background:var(--sun-t)}
+.txn{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden;background:#fff}
+.txn:last-child{margin-bottom:0}
+.txn.open{border-color:var(--sun);box-shadow:0 4px 14px rgba(58,50,46,.08)}
+.txn-head{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.txn-head:hover{background:var(--sun-t)}
+.txn-time{font-weight:800;color:var(--ink2);width:44px;flex:none}
+.txn-main{flex:1;min-width:0}
+.txn-ref{font-weight:800}
+.txn-sub{font-size:12.5px;color:var(--mut);font-weight:600}
+.txn-amt{font-family:"Baloo 2";font-weight:800;font-size:16px;width:118px;text-align:right;flex:none}
+.txn .chev{width:18px;height:18px;color:var(--mut);transition:transform .15s;flex:none}
+.txn.open .chev{transform:rotate(180deg)}
+.txn-body{padding:4px 16px 16px;border-top:1px solid var(--line2);background:#fffdf9}
+.txn-line{display:flex;justify-content:space-between;padding:10px 0;font-weight:700;border-bottom:1px solid var(--line2)}
+.txn-line:last-of-type{border-bottom:0}
+.txn-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+@media (max-width:600px){.np-grid{grid-template-columns:1fr}.txn-amt{width:92px}.txn-time{display:none}}
+
+@media (max-width:1080px){
+ .sell,.co{grid-template-columns:1fr}
+ .cart{position:static;max-height:none}
+ .set-grid{grid-template-columns:1fr}
+ .set-nav{position:static;display:flex;overflow-x:auto}
+ .set-nav button{white-space:nowrap}
+}
+@media (max-width:720px){
+ .app{grid-template-columns:1fr}
+ .rail{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border-right:0;border-top:1px solid var(--line);z-index:40;padding:8px;justify-content:space-around}
+ .rail .logo,.rail .spacer,.rail .helpbtn{display:none}
+ .navbtn{flex:1;padding:8px 2px}
+ .navbtn svg{width:23px;height:23px}
+ .main{padding-bottom:80px}
+ .topbar,.screen{padding-left:18px;padding-right:18px}
+ .methods{grid-template-columns:1fr}
+ .rights-tbl{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail">
+    <div class="logo">
+      <div class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8z"/><path d="M8 7c-3 1-4 4-4 7v5a2 2 0 002 2h12a2 2 0 002-2v-5c0-3-1-6-4-7"/></svg></div>
+      <div class="wm">Babyshop<br>POS</div>
+    </div>
+    <div id="navlist"></div>
+    <div class="spacer"></div>
+    <button class="helpbtn" id="helpOpen"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.2 9a2.8 2.8 0 015.5.8c0 1.9-2.8 2.5-2.8 2.5M12 17h.01"/></svg>Help</button>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="hello">
+        <h1 id="greet">Good afternoon, Njeri</h1>
+        <p id="subtitle">ilekela Baby &amp; Kids, Utawala</p>
+      </div>
+      <div class="right">
+        <div class="shift" id="shiftBox"><span class="dot"></span>Shift open</div>
+        <div class="me" id="meBox"></div>
+        <button class="lockbtn" id="signOut" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h7a2 2 0 002-2v-2"/><path d="M18 15l3-3-3-3M21 12H9"/></svg></button>
+      </div>
+    </div>
+    <div class="screen" id="screen"></div>
+  </div>
+</div>
+
+<div class="lock" id="lock"></div>
+<div class="toast" id="toast"></div>
+<div class="hwmodal" id="hwmodal"></div>
+
+<div class="drawer-bg" id="drawerBg"></div>
+<aside class="drawer" id="drawer">
+  <button class="close" id="helpClose">✕</button>
+  <h3>A little help</h3>
+  <p style="color:var(--ink2);font-size:13.5px;margin:0 0 6px">Quick answers for the till. Nothing here can break a sale.</p>
+  <div class="qa"><div class="q">Her M-PESA is slow, what do I do?</div><div class="a">Tap Send again to nudge her phone. If she has already paid the till, tap Match a code and paste the M-PESA message. The sale only closes once the money shows.</div></div>
+  <div class="qa"><div class="q">She wants to pay half now, half later</div><div class="a">On the Pay screen choose Split. Take what she has, the rest stays open and the till holds the items for her.</div></div>
+  <div class="qa"><div class="q">A button is missing for me</div><div class="a">Some things, like giving a big discount or sending a refund, are set for managers only. Ask a manager to sign in, or the owner can turn it on for you in Settings.</div></div>
+  <div class="qa"><div class="q">The size she wants is out of stock</div><div class="a">Tap the customer name and add a size reminder. She gets a WhatsApp the day the next delivery lands.</div></div>
+</aside>
+
+<script>
+const money = n => n.toLocaleString('en-KE');
+
+// Talk to the backend. Every mutating action goes through here so the
+// shop's data lives on the server and survives a refresh.
+async function api(path, method='GET', body){
+  const opts = { method, headers:{} };
+  if(body!==undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+  const res = await fetch(path, opts);
+  if(!res.ok){ let msg='Request failed'; try{ const j=await res.json(); msg=j.error||msg; }catch(e){} throw new Error(msg); }
+  return res.json();
+}
+const SHOP = { name:'ilekela Baby & Kids', branch:'Utawala', till:'5297841', pin:'P052xxxxxxG', vat:16 };
+let SETTINGS = {};   // raw shop settings from the server (toggles etc.)
+// Is a saved on/off setting enabled? Falls back to a sensible default when never saved.
+function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'||v===1||v===true) : def; }
+const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
+
+let PRODUCTS = [];   // loaded from the backend in boot()
+let CART = [];       // the sale in progress starts empty
+let saleCustomer = null;   // null = Walk-in; a real customer picker plugs in here later
+const subT = () => CART.reduce((t,l)=>t+l.p*l.q,0);
+// VAT is the tax inside the standard-rated lines only, after apportioning any KSh discount.
+// A line is exempt when its product's vat type is 'exempt'; a 0% shop rate means no VAT at all.
+function vatOf(lines, discount){
+  if(!setOn('vat_registered',false)) return 0;   // unregistered shop charges no VAT
+  const rate=SHOP.vat||0; if(rate<=0) return 0;
+  const sub=lines.reduce((t,l)=>t+l.p*l.q,0); if(sub<=0) return 0;
+  const stdSub=lines.reduce((t,l)=>t+((l.vt==='exempt')?0:l.p*l.q),0);
+  const taxableStd=stdSub-(discount||0)*(stdSub/sub);
+  return Math.round(taxableStd*rate/(100+rate));
+}
+const vatT = () => vatOf(CART, 0);
+const itemsT = () => CART.reduce((t,l)=>t+l.q,0);
+const CATS = ['Everything','Newborn','Baby, 0 to 2','Toddler, 3 to 5','Older, 6 to 10','Shoes','Home'];
+// Colour keys the shop website understands (must match its PALETTE).
+const WEB_PALETTE = {red:'#E8503A',yellow:'#F4B841',green:'#A6CE4E',teal:'#46AAC6',cream:'#EFD9B4',plum:'#B4749A',navy:'#3C6E8F',grey:'#B9C4C7'};
+
+let INTAKE = [];     // pending delivery lines, loaded in boot()
+let DELIVERY = null; // pending delivery header, loaded in boot()
+let RETURNS = [];    // loaded in boot()
+let TXNS = [];       // today's sales, loaded in boot()
+let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1;
+let repMethod=null;   // Reports: filter sales list by payment method (null = all)
+let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
+const ROLES = [
+  {n:'Owner',c:'#39322e'},{n:'Manager',c:'#2f6be6'},{n:'Cashier',c:'#ec7060'},{n:'Stock clerk',c:'#12995a'},{n:'Rider',c:'#f2a12a'}
+];
+const RIGHTS = [
+  ['Ring up a sale and take payment',[1,1,1,0,0],0],
+  ['Give a discount over 10 per cent',[1,1,0,0,0],1],
+  ['Cancel a sale or remove an item',[1,1,0,0,0],1],
+  ['Accept a delivery into stock',[1,1,0,1,0],0],
+  ['Set the selling price',[1,1,0,0,0],1],
+  ['Approve a return',[1,1,0,0,0],1],
+  ['Send a refund to M-PESA',[1,1,0,0,0],1],
+  ['See the cost price and profit',[1,1,0,0,0],0],
+  ['Close the day and print the report',[1,1,0,0,0],1],
+  ['Add or remove a staff member',[1,0,0,0,0],1],
+];
+
+/* -------- session, staff, permissions -------- */
+// Staff and their credentials live on the server; sign in checks /api/login.
+const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+let currentUser=null, loginUserVal='', loginError='';
+function roleIdx(){ return currentUser ? ROLES.findIndex(r=>r.n===currentUser.role) : -1; }
+function can(i){ const ri=roleIdx(); return ri>=0 && !!RIGHTS[i][1][ri]; }
+// right indexes: 0 sell,1 discount>10,2 cancel,3 accept delivery,4 set price,5 approve return,6 refund,7 see cost,8 close day,9 staff
+
+/* -------- held sales, online orders, discount -------- */
+let HELD = [];       // parked sales, loaded in boot()
+let ORDERS = [];     // online orders, loaded in boot()
+let orderFilter=null; // Orders screen: which status card is selected (null = show all)
+let saleDiscount=0, discPending=0, showParked=false;
+const dueT = () => Math.max(0, subT()-saleDiscount);   // saleDiscount is a KSh amount off
+
+/* -------- navigation (built from rights) -------- */
+const NAV = [
+  {key:'sell', label:'Sell', need:()=>can(0), icon:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.4 12.4a1 1 0 001 .8h9.2a1 1 0 001-.8L21 7H6"/>'},
+  {key:'orders', label:'Orders', need:()=>can(0)||currentUser.role==='Rider', badge:()=>ORDERS.filter(o=>o.st==='new').length, icon:'<path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 016 0"/>'},
+  {key:'stock', label:'Stock', need:()=>can(3)||can(4), icon:'<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>'},
+  {key:'reports', label:'Reports', need:()=>can(7)||can(8), icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'},
+  {key:'returns', label:'Returns', need:()=>can(0), icon:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 015 5v0a5 5 0 01-5 5H8"/>'},
+  {key:'settings', label:'Settings', need:()=>can(8), icon:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>'},
+];
+function allowedNav(){ return NAV.filter(n=>n.need()); }
+function buildNav(){
+  return allowedNav().map(n=>{
+    const b=n.badge?n.badge():0;
+    return `<button class="navbtn ${view===n.key?'on':''}" data-nav="${n.key}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.icon}</svg>${n.label}${b?`<span class="nbadge">${b}</span>`:''}</button>`;
+  }).join('');
+}
+
+/* -------- login screen -------- */
+function lockScreen(){
+  const mk='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8z"/><path d="M8 7c-3 1-4 4-4 7v5a2 2 0 002 2h12a2 2 0 002-2v-5c0-3-1-6-4-7"/></svg>';
+  const arrow='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  return `<div class="lock-card">
+    <div class="lock-mk">${mk}</div>
+    <h2>Babyshop POS</h2>
+    <div class="sub">Sign in to open the till</div>
+    <form class="login-form" id="loginForm">
+      <div class="login-field"><label for="loginUser">Username</label><input id="loginUser" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. wsheks" value="${loginUserVal.replace(/"/g,'&quot;')}"></div>
+      <div class="login-field"><label for="loginPass">Password</label><input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Your password"></div>
+      ${loginError?`<div class="login-err">${loginError}</div>`:''}
+      <button type="submit" class="login-btn">Sign in ${arrow}</button>
+    </form>
+    <div class="hint">Demo sign in: wsheks / babyshop</div>
+  </div>`;
+}
+function refreshLock(){
+  const l=document.getElementById('lock'); l.innerHTML=lockScreen();
+  const f=document.getElementById(loginUserVal?'loginPass':'loginUser'); if(f) f.focus();
+}
+async function doLogin(){
+  const u=document.getElementById('loginUser'), p=document.getElementById('loginPass');
+  const username=(u&&u.value||'').trim(), password=(p&&p.value||'');
+  loginUserVal=username;
+  if(!username||!password){ loginError='Enter your username and password'; refreshLock(); return; }
+  try{
+    const r=await api('/api/login','POST',{username,password});
+    currentUser=r.user; loginError=''; loginUserVal='';
+    try{ localStorage.setItem('babypos_user', JSON.stringify(currentUser)); }catch(e){}
+    const first=allowedNav()[0]; view = first?first.key:'sell';
+    render();
+  }catch(err){
+    loginError='Wrong username or password';
+    const l=document.getElementById('lock'); l.classList.add('shake'); setTimeout(()=>l.classList.remove('shake'),320);
+    refreshLock();
+  }
+}
+
+/* -------- online orders view -------- */
+function orders(){
+  const chic={wa:['#e6f5ec','#0f7a44','<path d="M12 3a9 9 0 00-8 13l-1 5 5-1a9 9 0 108-17z"/>'],tt:['#efe7f7','#6c4bb3','<path d="M16 4c1 2 3 3 5 3v3c-2 0-4-1-5-2v7a5 5 0 11-5-5"/>']};
+  const stName={new:'New',packed:'Packed',rider:'With rider',delivered:'Delivered'};
+  const next={new:['packed','Mark packed'],packed:['rider','Give to rider'],rider:['delivered','Mark delivered']};
+  const isRider=currentUser.role==='Rider';
+  const nw=ORDERS.filter(o=>o.st==='new').length, aw=ORDERS.filter(o=>o.pay==='await').length,
+        rd=ORDERS.filter(o=>o.st==='rider').length, dl=ORDERS.filter(o=>o.st==='delivered').length;
+  const cards=[['new','New to pack',nw],['await','Awaiting payment',aw],['rider','Out with a rider',rd],['delivered','Delivered',dl]];
+  const inFilter=o=> !orderFilter ? true : (orderFilter==='await' ? o.pay==='await' : o.st===orderFilter);
+  const shownCount=ORDERS.filter(inFilter).length;
+  const activeCard=cards.find(c=>c[0]===orderFilter);
+  return `<div class="phead"><h2>Online orders</h2><p>Orders from WhatsApp and TikTok Shop land here. Pack them, hand them to a rider, and mark them delivered. Paid orders take the item off the shelf automatically.</p></div>
+  <div class="stats">
+    ${cards.map(c=>`<button class="stat stat-btn ${orderFilter===c[0]?'on':''}" data-ordfilter="${c[0]}"><div class="l">${c[1]}</div><div class="v num">${c[2]}</div></button>`).join('')}
+  </div>
+  <div class="panel" style="padding:16px"><div class="pt" style="padding:0 4px 12px"><h3>${activeCard?activeCard[1]:'All orders'}</h3><span class="badge">${shownCount}${orderFilter?'':' today'}</span>${orderFilter?`<button class="btn sm" data-ordfilter="all" style="margin-left:10px">Show all</button>`:''}</div>
+    ${shownCount===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">No orders in this group right now.</div>`:''}
+    ${ORDERS.map((o,i)=>{
+      if(!inFilter(o)) return '';
+      const c=chic[o.ch]; const nx=next[o.st];
+      const canAct = nx && (o.st==='rider' ? (can(0)||isRider) : (can(0)&&!isRider)) && (o.pay!=='await');
+      return `<div class="ord">
+        <div class="chic" style="background:${c[0]};color:${c[1]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${c[2]}</svg></div>
+        <div class="body">
+          <div class="r1"><span class="cust">${o.cust}</span><span class="chan ${o.ch}">${o.ch==='wa'?'WhatsApp':'TikTok'}</span><span class="pill ${o.st}">${stName[o.st]}</span>${o.pay==='await'?'<span class="pill await">Not paid yet</span>':'<span class="pill delivered">Paid</span>'}</div>
+          <div class="meta">${o.id} · ${o.area} · ${o.t}</div>
+          <div class="its">${o.items.map(it=>`${it[1]} × ${it[0]}`).join('<br>')}</div>
+        </div>
+        <div class="right"><div class="amt num">KSh ${money(o.amt)}</div>
+          ${o.pay==='await' ? '<span class="meta">Waiting on M-PESA</span>'
+            : nx ? (canAct ? `<button class="btn ${o.st==='rider'?'green':'sun'} sm" data-ordnext="${i}">${nx[1]}</button>` : `<span class="meta">${isRider?'Rider job only after packing':'Ask the counter'}</span>`)
+            : '<span class="pill delivered">Done</span>'}
+          ${can(2)?`<button class="btn ghost sm" data-orddismiss="${i}" style="color:var(--stop);padding:6px 4px">Remove</button>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* -------- parked sales panel (shown on Sell) -------- */
+function parkedPanel(){
+  if(!showParked) return '';
+  if(HELD.length===0) return `<div class="parked"><div class="ph"><h4>Parked sales</h4><button class="chg" data-parked="close">Close</button></div><div style="color:var(--mut);font-weight:600;padding:6px 0 8px">Nothing parked right now. Use Hold or Reserve to park a sale.</div></div>`;
+  return `<div class="parked"><div class="ph"><h4>Parked sales (${HELD.length})</h4><button class="chg" data-parked="close">Close</button></div>
+    ${HELD.map((h,i)=>`<div class="held"><div><div class="hn">${h.cust||'Walk-in'} ${h.type==='reserve'?'<span class="pill info" style="margin-left:6px">Reserved</span>':''}</div><div class="hd">${h.lines.reduce((t,l)=>t+l.q,0)} items · KSh ${money(h.lines.reduce((t,l)=>t+l.p*l.q,0))}${h.deposit?` · deposit ${money(h.deposit)} paid`:''} · ${h.at}</div></div><div class="hb"><button class="btn green sm" data-resume="${i}">Resume</button><button class="btn sm" data-drop="${i}">Remove</button></div></div>`).join('')}
+  </div>`;
+}
+
+/* -------- SELL -------- */
+function sell(){
+  const empty = CART.length===0;
+  return `<div class="sell">
+    <div>
+      <div class="searchwrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input class="search" placeholder="Search a name, age or scan a tag">
+      </div>
+      <div style="font-size:12px;color:var(--mut);font-weight:600;margin:2px 2px 12px;display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block"></span>Scanner ready. Scan a tag, or type a code and press Enter.</div>
+      <div class="chips">${CATS.map((c,i)=>`<button class="chip ${i===0?'on':''}">${c}</button>`).join('')}</div>
+      <div class="products">
+        ${PRODUCTS.map((p,i)=>`<button class="pcard" data-add="${i}">
+          <div class="pic">${babyIcon}</div>
+          <div class="nm">${p.n}</div>
+          <div class="age">${p.a}</div>
+          <div class="foot">
+            <div class="pr">${money(p.p)}</div>
+            <span class="stk ${p.s<5?'low':''}">${p.s} left</span>
+          </div>
+        </button>`).join('')}
+      </div>
+    </div>
+    <div class="cart">
+      <div class="ch">
+        <div class="row"><h3>This sale</h3><div style="display:flex;gap:8px;align-items:center"><button class="parkchip" data-parked="open"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/></svg>Parked ${HELD.length}</button><button class="clear" data-clear>Start over</button></div></div>
+        <div class="who">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 21a6.5 6.5 0 0113 0"/></svg></div>
+          <div><div class="nm">${saleCustomer?saleCustomer.name:'Walk-in customer'}</div><div class="dt">${saleCustomer?saleCustomer.detail:'Add a name for the receipt'}</div></div>
+          <button class="chg">${saleCustomer?'Change':'Add'}</button>
+        </div>
+      </div>
+      ${parkedPanel()}
+      <div class="lines">
+        ${empty ? `<div style="text-align:center;color:var(--mut);padding:44px 16px;font-weight:600">Nothing here yet.<br>Tap a product on the left to start a sale.</div>`
+        : CART.map((l,i)=>`<div class="line">
+          <div>
+            <div class="nm">${l.n}</div><div class="age">${l.a}</div>
+            <div class="stepper"><button data-dec="${i}">−</button><span class="q">${l.q}</span><button data-inc="${i}">+</button></div>
+          </div>
+          <div class="pr">${money(l.p*l.q)}</div>
+        </div>`).join('')}
+      </div>
+      <div class="foot">
+        <div class="trow"><span>${itemsT()} item${itemsT()!==1?'s':''}</span><span class="num">KSh ${money(subT())}</span></div>
+        <div class="grand"><span>To pay</span><b class="num">${money(subT())}</b></div>
+        <div class="vat">${vatT()>0?`Includes VAT at ${SHOP.vat}%, KSh ${money(vatT())}`:'No VAT on this sale'}</div>
+        <button class="pay-btn" data-goto="checkout" ${empty?'disabled style="opacity:.45;pointer-events:none"':''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          Take payment
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px">
+          <button class="hold" data-hold ${empty?'disabled style="opacity:.45;pointer-events:none"':''}>Hold for later</button>
+          <button class="hold" data-reserve ${empty?'disabled style="opacity:.45;pointer-events:none"':''}>Reserve, deposit</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* -------- CHECKOUT (a step inside the sale, not a menu item) -------- */
+let payMethod='mpesa', payStage='choose', cashGiven=0, splitParts=[], paidAmount=0;
+function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;}
+// Apply a manual KSh discount. Over 10% of the sale needs a manager (held in discPending until approved).
+function applyDiscount(amt){
+  amt=Math.max(0, Math.min(Math.round(amt)||0, subT()));
+  if(amt>subT()*0.10 && !can(1)){ discPending=amt; saleDiscount=0; }
+  else { saleDiscount=amt; discPending=0; }
+}
+
+const stkIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
+const infoIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>';
+
+function payPanel(){
+  const total=dueT();
+  if(payMethod==='mpesa'){
+    if(payStage==='waiting'){
+      return `<div class="mpesa-flow" style="display:block">
+        <div class="phone-il"><div class="ring"></div><div class="body">
+          <div class="stk-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7H14a3.5 3.5 0 010 7H6"/></svg></div>
+          <div class="tt">Pay ilekela<br>KSh ${money(total)}</div></div></div>
+        <div class="wait-t">Waiting for her PIN</div>
+        <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>She just taps her M-PESA PIN. Expires in 1:42.</div>
+        <div style="display:grid;gap:9px;margin-top:18px">
+          <button class="bigbtn" data-pay="paid">${stkIcon} She has paid</button>
+          <button class="bigbtn ghost" data-pay="send">Send the request again</button>
+          <button class="bigbtn ghost" data-pay="match">She paid the till, match her code</button>
+        </div></div>`;
+    }
+    return `<div class="fld"><label>Her M-PESA number</label><input value="0722 418 903"></div>
+      <button class="bigbtn" data-pay="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg> Send request to her phone</button>
+      <div class="tip" style="margin-top:16px"><div class="ic">${infoIcon}</div><p>She gets a prompt on her phone and enters her PIN. Nothing to type on this side.</p></div>`;
+  }
+  if(payMethod==='card'){
+    if(payStage==='cardsent'){
+      return `<div style="text-align:center;padding:18px 0 6px">
+        <div class="paid-circle" style="background:var(--blue-t)"><svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg></div>
+        <div class="baloo" style="font-size:19px;font-weight:700">Sent to the terminal</div>
+        <div style="color:var(--ink2);font-weight:600;margin-top:6px">She can tap or insert her card now for KSh ${money(total)}.</div>
+        <button class="bigbtn blue" style="margin-top:20px" data-pay="paid">${stkIcon} Payment received</button></div>`;
+    }
+    return `<button class="bigbtn blue" data-pay="cardsend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg> Send KSh ${money(total)} to the terminal</button>
+      <div class="tip" style="margin-top:16px"><div class="ic">${infoIcon}</div><p>The amount goes straight to the Equity terminal, no retyping.</p></div>`;
+  }
+  if(payMethod==='cash'){
+    const change=Math.max(0,cashGiven-total), enough=cashGiven>=total;
+    return `<div class="fld"><label>Cash she gave you</label><input id="cashin" value="${cashGiven||''}" placeholder="0" inputmode="numeric"></div>
+      <div class="quick">
+        <button data-cash="${total}">Exact, ${money(total)}</button>
+        <button data-cash="5000">5,000</button>
+        <button data-cash="10000">10,000</button>
+      </div>
+      <div class="changebox" style="background:${enough?'var(--mpesa-t)':'#f6efe3'}"><span>Change to give her</span><b class="num baloo" style="font-size:20px;color:${enough?'var(--mpesa)':'var(--mut)'}">KSh ${money(change)}</b></div>
+      <button class="bigbtn sun" style="margin-top:16px" data-pay="paid" ${enough?'':'disabled'}>${stkIcon} Done, print the receipt</button>`;
+  }
+  const paid=splitParts.reduce((t,x)=>t+x.amt,0), remain=Math.max(0,total-paid);
+  return `<div style="color:var(--ink2);font-weight:700;margin-bottom:12px">Take it in parts. The balance drops as each one goes through.</div>
+    ${splitParts.map(x=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line2);font-weight:700"><span>${x.label}</span><span class="num" style="color:var(--mpesa)">− ${money(x.amt)}</span></div>`).join('')}
+    <div style="display:flex;justify-content:space-between;margin:14px 0;font-weight:800"><span>Still to pay</span><b class="num baloo" style="font-size:22px;color:${remain?'var(--coral)':'var(--mpesa)'}">KSh ${money(remain)}</b></div>
+    ${remain>0
+      ? `<div style="display:grid;gap:9px"><button class="bigbtn ghost" data-split="mpesa">Add M-PESA, ${money(Math.min(remain,5000))}</button><button class="bigbtn ghost" data-split="cash">Add cash, the rest (${money(remain)})</button></div>`
+      : `<button class="bigbtn" data-pay="paid">${stkIcon} Fully paid, print the receipt</button>`}`;
+}
+
+function checkout(){
+  const total=dueT();
+  if(payStage==='done'){
+    const label={mpesa:'M-PESA',card:'Card',cash:'Cash',split:'Split payment'}[payMethod];
+    return `<div class="paid-wrap">
+      <div class="paid-circle">${stkIcon}</div>
+      <h2 class="baloo" style="font-size:27px">Paid, thank you</h2>
+      <div class="paid-amt num">KSh ${money(paidAmount)}</div>
+      <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}</div>
+      <div class="paid-card">
+        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v17H6z"/><path d="M9 8h6M9 12h6"/></svg><span>Receipt printed</span><span class="pill ok" style="margin-left:auto">Done</span></div>
+        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg><span>Sent to her on WhatsApp</span><span class="pill ok" style="margin-left:auto">Done</span></div>
+        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/></svg><span>Logged as an eTIMS tax receipt</span><span class="pill ok" style="margin-left:auto">Done</span></div>
+      </div>
+      <button class="bigbtn" data-pay="newsale">Start a new sale</button>
+    </div>`;
+  }
+  const methods=[
+    ['mpesa','M-PESA','Send a request to her phone','<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/>'],
+    ['card','Card','Tap or insert on the terminal','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/>'],
+    ['cash','Cash','We work out her change','<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>'],
+    ['split','Split it','Part one way, part another','<path d="M12 3v18M12 8H7a2 2 0 00-2 2M12 8h5a2 2 0 012 2"/>'],
+  ];
+  const paid=splitParts.reduce((t,x)=>t+x.amt,0);
+  return `<div class="backbar">
+      <button class="back" data-pay="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg> Back to the sale</button>
+    </div>
+    <div class="paysteps">
+      <div class="s done"><div class="n">${stkIcon}</div><div class="lb">Items added</div></div>
+      <div class="arw">›</div>
+      <div class="s now"><div class="n">2</div><div class="lb">Take payment</div></div>
+      <div class="arw">›</div>
+      <div class="s"><div class="n">3</div><div class="lb">Receipt</div></div>
+    </div>
+    <div class="co">
+      <div class="co-card">
+        <h3>How is she paying?</h3>
+        <p class="hint">Whatever you choose shows on her side of the counter too.</p>
+        <div class="methods">
+          ${methods.map(m=>`<button class="method ${m[0]} ${payMethod===m[0]?'on':''}" data-pm="${m[0]}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m[3]}</svg></div><div><div class="t">${m[1]}</div><div class="d">${m[2]}</div></div></button>`).join('')}
+        </div>
+        <div style="border-top:1px solid var(--line2);margin:4px 0 16px;padding-top:14px">
+          <h3 style="font-size:15px;margin-bottom:9px">Discount</h3>
+          <div class="disc-amt">
+            <span class="ksh">KSh</span>
+            <input id="discIn" inputmode="numeric" placeholder="0" value="${saleDiscount||''}">
+            <button class="btn sm" data-discapply>Apply</button>
+            ${(saleDiscount>0||discPending>0)?`<button class="btn sm" data-disc="0">Clear</button>`:''}
+          </div>
+          <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:7px">Type the amount to take off the sale. Anything over 10% of the sale needs a manager.</div>
+          ${discPending?`<div class="mgr" style="margin-top:12px"><div class="mt">Taking off KSh ${money(discPending)} is more than 10% of this sale, so a manager must approve it. Enter a manager PIN.</div><div style="display:flex;gap:10px;align-items:center"><input id="mgrpin" inputmode="numeric" maxlength="4" placeholder="0000"><button class="btn green sm" data-discapprove>Approve</button><button class="btn sm" data-disccancel>Cancel</button></div></div>`:''}
+        </div>
+        <div id="paypanel">${payPanel()}</div>
+      </div>
+      <div class="co-card co-summary">
+        <h3 style="margin-bottom:14px">Sale summary</h3>
+        ${CART.map(l=>`<div class="ln"><div>${l.n}<div class="q">${l.q} at ${money(l.p)}</div></div><b class="num">${money(l.p*l.q)}</b></div>`).join('')}
+        <div class="co-total">
+          ${saleDiscount>0?`<div class="paid"><span>Subtotal</span><span class="num">KSh ${money(subT())}</span></div><div class="paid" style="color:var(--mpesa)"><span>Discount</span><span class="num">− KSh ${money(subT()-total)}</span></div>`:''}
+          <div class="g"><span style="font-weight:800;color:var(--ink2)">${saleDiscount>0?'To pay':'Total'}</span><b class="num">${money(total)}</b></div>
+          ${vatOf(CART,saleDiscount)>0?`<div class="paid"><span>Includes VAT ${SHOP.vat}%</span><span class="num">KSh ${money(vatOf(CART,saleDiscount))}</span></div>`:`<div class="paid"><span>VAT</span><span class="num">None</span></div>`}
+          <div class="paid"><span>Paid so far</span><span class="num">KSh ${money(paid)}</span></div>
+          <div class="due"><span>Still to pay</span><span class="num">KSh ${money(Math.max(0,total-paid))}</span></div>
+        </div>
+        <div style="margin-top:18px;font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">The receipt sends to her WhatsApp and prints as an eTIMS receipt the moment the money clears.</div>
+      </div>
+    </div>`;
+}
+
+/* -------- STOCK: products catalogue + deliveries -------- */
+const marg = pr => Math.round((pr.p-pr.c)/pr.p*100);
+function stockTabs(){
+  return `<div class="chips" style="margin-bottom:18px">
+    <button class="chip ${stockTab==='products'?'on':''}" data-stab="products">Products (${PRODUCTS.length})</button>
+    <button class="chip ${stockTab==='deliveries'?'on':''}" data-stab="deliveries">Deliveries to accept (${DELIVERY?1:0})</button>
+  </div>`;
+}
+function deliveriesPanel(){
+  if(!DELIVERY || INTAKE.length===0){
+    return `<div class="panel"><div class="pt"><h3>Deliveries</h3></div>
+      <div style="padding:28px 20px;color:var(--mut);font-weight:600">No deliveries waiting to be accepted. When a new consignment arrives it shows up here to count and accept into your products.</div></div>`;
+  }
+  const inN=INTAKE.reduce((t,r)=>t+r.got,0), okCount=INTAKE.filter(r=>r.st==='ok').length;
+  return `<div class="stats">
+    <div class="stat"><div class="l">Pieces expected</div><div class="v num">128</div></div>
+    <div class="stat"><div class="l">Counted so far</div><div class="v num">${inN}</div></div>
+    <div class="stat"><div class="l">Ready to accept</div><div class="v num">${okCount} of ${INTAKE.length} lines</div></div>
+    <div class="stat"><div class="l">Retail value</div><div class="v num">302,800</div></div>
+  </div>
+  <div class="panel">
+    <div class="pt"><h3>Delivery TR-2607, Istanbul</h3><span class="badge">Landed 26 July</span></div>
+    <div class="list">
+      ${INTAKE.map(r=>`<div class="item-row">
+        <div class="thumb">${babyIcon}</div>
+        <div>
+          <div class="ir-nm">${r.n}</div>
+          <div class="ir-sub">${r.a} · you set the price at <b>KSh ${money(r.sell)}</b> ${can(7)?` (cost ${money(r.cost)}, a ${Math.round((r.sell-r.cost)/r.sell*100)}% margin)`:``}</div>
+          ${r.st==='short'?'<div class="match off">You counted 16, the paper says 18. Two are missing.</div>':r.st==='damaged'?'<div class="match off">One has a torn seam. Keep it out and sell it as seconds.</div>':'<div class="match">Count matches the delivery note.</div>'}
+        </div>
+        <div class="ir-right">
+          ${r.st==='ok'?'<span class="pill ok">Ready</span>':`<div class="count-box"><button>−</button><span class="c">${r.got}</span><button>+</button></div><div style="display:flex;gap:8px"><button class="btn sm">Hold</button></div>`}
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
+    ${can(3)?`<button class="btn green" data-accept-delivery>Accept the delivery into products</button>`:`<span style="color:var(--mut);font-size:13px;font-weight:600">A manager or stock clerk accepts deliveries</span>`}
+    <button class="btn">Tell the supplier about the two missing</button>
+    <span style="color:var(--mut);font-size:13px;font-weight:600">Accepting adds every counted piece to the Products list. Prices come from your import calculator and round up to the nearest hundred.</span>
+  </div>`;
+}
+function productsPanel(){
+  const units=PRODUCTS.reduce((t,p)=>t+p.s,0);
+  const low=PRODUCTS.filter(p=>p.s<5).length;
+  const costVal=PRODUCTS.reduce((t,p)=>t+p.s*p.c,0);
+  const retail=PRODUCTS.reduce((t,p)=>t+p.s*p.p,0);
+  const banner = justReceived>0 ? `<div class="recv-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg><div>${justReceived} pieces from delivery TR-2607 have been added to your products. Their stock counts are now updated.</div></div>` : '';
+  const form = addingProduct ? `<div class="np-form">
+    <div class="pt" style="padding:0 0 12px"><h3>Add a new product</h3></div>
+    <div class="np-grid">
+      <div class="field" style="grid-column:1 / -1"><label>What is it called</label><input id="np-name" placeholder="e.g. Corduroy dungarees"></div>
+      <div class="field"><label>Age range</label><input id="np-age" placeholder="e.g. 1 to 2 years"></div>
+      <div class="field"><label>Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric"></div>
+      <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
+      <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
+      <div class="field" style="grid-column:1 / -1"><label>VAT</label><select id="np-vat" class="sel" style="padding:12px 14px;width:100%"><option value="standard">Standard rate${setOn('vat_registered',false)?` (${SHOP.vat}%, included in the price)`:' (VAT applies once you register)'}</option><option value="exempt">VAT exempt (never carries VAT)</option></select></div>
+      <div class="field" style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:12px"><label style="color:var(--sun-d)">For the shop website</label></div>
+      <div class="field"><label>Category</label><input id="np-category" placeholder="e.g. Newborn, Tops, Warmth"></div>
+      <div class="field"><label>Sizes (comma separated)</label><input id="np-sizes" placeholder="e.g. 0-3m, 3-6m, 1-2y"></div>
+      <div class="field"><label>Was price (KSh, optional)</label><input id="np-was" placeholder="for a Save badge" inputmode="numeric"></div>
+      <div class="field"><label>Image link (optional)</label><input id="np-image" placeholder="Leave blank to draw a picture"></div>
+      <div class="field" style="grid-column:1 / -1"><label>Colours shown online</label><div id="np-colours" style="display:flex;flex-wrap:wrap;gap:8px">${Object.entries(WEB_PALETTE).map(([k,hex])=>`<label style="display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line2);border-radius:999px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--ink2);cursor:pointer"><input type="checkbox" value="${k}"><span style="width:13px;height:13px;border-radius:50%;background:${hex};display:inline-block"></span>${k}</label>`).join('')}</div></div>
+      <div class="field" style="grid-column:1 / -1;flex-direction:row;align-items:center;gap:20px;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-online" checked> Sell this on the website</label><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-featured"> Feature it (Picked for you)</label></div>
+    </div>
+    <div style="font-size:12.5px;color:var(--mut);font-weight:600;margin:2px 0 14px">Tip: your import calculator suggests a selling price from the cost, rounded up to the nearest hundred. You can always change it. Age range fills the website's "Fits ... to ..." from what you typed above.</div>
+    <div style="display:flex;gap:10px"><button class="btn green" data-saveprod>Save and add to products</button><button class="btn" data-cancelprod>Cancel</button></div>
+  </div>` : '';
+  const shownProds=PRODUCTS.filter(p=>stockFilter==='low'?p.s<5:true);
+  return `<div class="stats">
+    <button class="stat stat-btn ${stockFilter===null?'':''}" data-stockfilter="all"><div class="l">Products</div><div class="v num">${PRODUCTS.length}</div></button>
+    <button class="stat stat-btn" data-stockfilter="all"><div class="l">Pieces in stock</div><div class="v num">${units}</div></button>
+    <button class="stat stat-btn ${stockFilter==='low'?'on':''}" data-stockfilter="low"><div class="l">Running low</div><div class="v num">${low}</div></button>
+    ${can(7)?`<button class="stat stat-btn" data-stockfilter="all"><div class="l">Stock value, at cost</div><div class="v num">${money(costVal)}</div></button>`:`<button class="stat stat-btn" data-stockfilter="all"><div class="l">Stock value</div><div class="v num">${money(retail)}</div></button>`}
+  </div>
+  ${banner}
+  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+    <div class="searchwrap" style="flex:1;min-width:200px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input class="search" placeholder="Search products by name, age or code"></div>
+    ${can(4)?`<button class="btn sun" data-addprod><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a product</button>`:`<span style="color:var(--mut);font-size:13px;font-weight:600">Ask a manager to add products or change prices</span>`}
+  </div>
+  ${form}
+  <div class="panel">
+    <div class="pt"><h3>${stockFilter==='low'?'Running low':'All products'}</h3><span class="badge">${stockFilter==='low'?shownProds.length+' to reorder':'Everything in the system'}</span>${stockFilter?`<button class="btn sm" data-stockfilter="all" style="margin-left:10px">Show all</button>`:''}</div>
+    <div class="list">
+      ${shownProds.length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">Nothing running low right now.</div>`:''}
+      ${shownProds.map(pr=>`<div class="item-row">
+        <div class="thumb">${babyIcon}</div>
+        <div>
+          <div class="ir-nm">${pr.n}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}</div>
+          <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
+        </div>
+        <div class="ir-right">
+          <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
+          <span class="pill ${pr.s<5?'warn':'ok'}">${pr.s} in stock</span>
+          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button></div>`:''}
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+function stock(){
+  const head = stockTab==='products'
+    ? `<div class="phead"><h2>Products and stock</h2><p>Every item you sell lives here. This is where received deliveries land, and where you add something new to the shop.</p></div>`
+    : `<div class="phead"><h2>Deliveries</h2><p>Count a delivery as you open the cartons, then accept it. Accepted pieces go straight into your Products list. Anything short or damaged stays out until you decide.</p></div>`;
+  return head + stockTabs() + (stockTab==='deliveries' ? deliveriesPanel() : productsPanel());
+}
+
+/* -------- RETURNS -------- */
+function returns(){
+  return `<div class="phead"><h2>Returns and swaps</h2><p>Most returns here are just a size. We swap first, and only refund when there is nothing to swap into. Within 14 days with a receipt.</p></div>
+  <div class="stats">
+    <div class="stat"><div class="l">This month</div><div class="v num">7</div></div>
+    <div class="stat"><div class="l">Swapped</div><div class="v num">5</div></div>
+    <div class="stat"><div class="l">Refunded</div><div class="v num">2</div></div>
+    <div class="stat"><div class="l">Most common reason</div><div class="v sm">Wrong size bought</div></div>
+  </div>
+  <div class="panel">
+    <div class="pt"><h3>Recent returns</h3><span class="badge">2 need you</span></div>
+    <div class="list">
+      ${RETURNS.map(r=>`<div class="item-row">
+        <div class="thumb" style="background:${r.st==='done'?'#eaf6ef':'#fdefd7'};color:${r.st==='done'?'var(--ok)':'var(--sun-d)'}">
+          ${r.st==='done'
+            ?'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>'
+            :'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 010 10H9"/></svg>'}
+        </div>
+        <div>
+          <div class="ir-nm">${r.c}</div>
+          <div class="ir-sub">${r.item}</div>
+          <div class="ir-sub" style="color:var(--mut)">${r.why} · ${r.d}</div>
+        </div>
+        <div class="ir-right">
+          ${r.st==='done'?'<span class="pill ok">'+r.act+'</span>'
+            :r.st==='wait'?'<span class="pill warn">Needs a manager</span><div style="display:flex;gap:8px"><button class="btn green sm">Approve refund</button><button class="btn sm">Swap instead</button></div>'
+            :'<span class="pill info">Swap</span><button class="btn sun sm">Find her size</button>'}
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div class="tip" style="max-width:640px">
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg></div>
+    <p>A swap goes through on the spot. A <b>refund to M-PESA</b> sends the money back to the number that paid, so a manager approves it and the reason is kept with the sale.</p>
+  </div>`;
+}
+
+/* -------- SETTINGS -------- */
+let setTab = 'rights';
+function settings(){
+  const tabs = [
+    ['rights','Who can do what','<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/><path d="M16 4a3.5 3.5 0 010 7M15 20a5.5 5.5 0 00-1-3.4"/>'],
+    ['pay','Payments','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/>'],
+    ['tax','Tax and receipts','<path d="M6 2h9l3 3v17H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>'],
+    ['channels','Online selling','<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 000 18M12 3a14 14 0 010 18"/>'],
+    ['shop','Shop and staff','<path d="M4 9h16l-1-5H5z"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/>'],
+    ['devices','Printers and devices','<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/>'],
+  ];
+  let body = '';
+  if(setTab==='rights'){
+    body = `<div class="panel">
+      <div class="pt"><h3>Who can do what</h3><span style="margin-left:auto;font-size:13px;color:var(--ink2);font-weight:700">Turn a job off and the button hides for that person</span></div>
+      <div style="overflow-x:auto"><table class="rights-tbl"><thead><tr>
+        <th>Job</th>
+        ${ROLES.map(r=>`<th><div class="rl-head"><div class="av" style="background:${r.c}">${r.n[0]}</div>${r.n}</div></th>`).join('')}
+      </tr></thead><tbody>
+        ${RIGHTS.map((row,i)=>`<tr>
+          <td>${row[0]}${row[2]?'<span class="money-note"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 10V7a6 6 0 0112 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/></svg>PIN</span>':''}</td>
+          ${row[1].map((v,j)=>`<td><button class="switch ${v?'on':''}" data-sw="r${i}${j}" aria-label="toggle"></button></td>`).join('')}
+        </tr>`).join('')}
+      </tbody></table></div>
+      <div style="padding:16px 20px;border-top:1px solid var(--line2);font-size:13px;color:var(--ink2);font-weight:600">Jobs marked <b>PIN</b> touch money, so they always ask for a manager PIN, even when they are switched on. Every change here is saved with your name and the time.</div>
+    </div>`;
+  }
+  if(setTab==='pay'){
+    body = `<div class="panel">
+      <div class="pt"><h3>How you get paid</h3></div>
+      <div class="set-row"><div><div class="t">M-PESA request to the phone</div><div class="d">Buy Goods till ${SHOP.till}. She approves with her PIN, no codes to type.</div></div><div class="val"><button class="switch ${setOn('pay_mpesa',true)?'on':''}" data-swkey="pay_mpesa"></button></div></div>
+      <div class="set-row"><div><div class="t">Card terminal</div><div class="d">Equity, paired to this counter. Visa and Mastercard.</div></div><div class="val">Connected<button class="switch ${setOn('pay_card',true)?'on':''}" data-swkey="pay_card"></button></div></div>
+      <div class="set-row"><div><div class="t">Cash</div><div class="d">Change is worked out for the cashier.</div></div><div class="val"><button class="switch ${setOn('pay_cash',true)?'on':''}" data-swkey="pay_cash"></button></div></div>
+      <div class="field"><label>Cash in the drawer at opening</label><input value="KSh 3,000"></div>
+      <div class="set-row"><div><div class="t">Allow split payments</div><div class="d">A customer can pay part M-PESA, part cash or card.</div></div><div class="val"><button class="switch ${setOn('pay_split',true)?'on':''}" data-swkey="pay_split"></button></div></div>
+    </div>`;
+  }
+  if(setTab==='tax'){
+    const vreg=setOn('vat_registered',false);
+    body = `<div class="panel">
+      <div class="pt"><h3>Tax and receipts</h3></div>
+      <div class="set-row"><div><div class="t">VAT registered with KRA</div><div class="d">Turn this on only if your shop is registered for VAT. While it is off, no VAT is charged to customers, which is correct if your turnover is under KES 5,000,000. Your standard and exempt product tags are kept either way.</div></div><div class="val">${vreg?'<span class="pill ok">Registered</span>':'<span class="pill warn">Not registered</span>'}<button class="switch ${vreg?'on':''}" data-swkey="vat_registered"></button></div></div>
+      <div class="field"><label>KRA PIN</label><input value="${SHOP.pin}"></div>
+      <div class="set-row"><div><div class="t">eTIMS receipts</div><div class="d">Every paid sale becomes a valid tax receipt.</div></div><div class="val">${setOn('etims_receipts',true)?'<span class="pill ok">Online</span>':''}<button class="switch ${setOn('etims_receipts',true)?'on':''}" data-swkey="etims_receipts"></button></div></div>
+      <div class="set-row"><div><div class="t">VAT rate</div><div class="d">${vreg?'Shown as included in the shelf price. Mark individual products as VAT exempt in Stock.':'Only used once you are VAT registered. No VAT is charged while you are not registered.'}</div></div><div class="val"><input id="vatInput" inputmode="numeric" maxlength="3" value="${SHOP.vat}" style="width:64px;border:2px solid var(--line2);border-radius:10px;padding:9px 10px;font:inherit;font-weight:800;font-family:'Baloo 2';font-size:16px;text-align:center;background:#fff${vreg?'':';opacity:.6'}">%<button class="btn green sm" data-savevat>Save</button></div></div>
+      <div class="set-row"><div><div class="t">Send the receipt on WhatsApp</div><div class="d">Goes to the customer number as well as printing.</div></div><div class="val"><button class="switch ${setOn('receipt_whatsapp',true)?'on':''}" data-swkey="receipt_whatsapp"></button></div></div>
+    </div>`;
+  }
+  if(setTab==='channels'){
+    const onlineCount=PRODUCTS.filter(p=>p.online!==0).length;
+    const pubAt=SETTINGS.catalogue_published_at?new Date(SETTINGS.catalogue_published_at).toLocaleString('en-GB'):null;
+    body = `<div class="panel" style="margin-bottom:16px">
+      <div class="pt"><h3>Publish to the shop website</h3><span class="badge">${onlineCount} online</span></div>
+      <div class="set-row"><div><div class="t">Send your catalogue to the website</div><div class="d">Builds the product list the ilekela shop website shows to customers, from the items marked "sell online". ${pubAt?('Last published '+pubAt+' with '+(SETTINGS.catalogue_count||0)+' items.'):'Not published yet.'}</div></div><div class="val" style="flex-direction:column;align-items:flex-end;gap:9px">${can(4)?'<button class="btn green sm" data-publishcat>Publish now</button>':'<span style="color:var(--mut);font-size:12.5px;font-weight:600">Managers publish</span>'}<a class="btn sm" href="/api/catalogue.json" target="_blank" rel="noopener" style="text-decoration:none">Preview the file</a></div></div>
+    </div>
+    <div class="panel">
+      <div class="pt"><h3>Selling online</h3></div>
+      <div class="set-row"><div><div class="t">TikTok Shop orders</div><div class="d">Orders drop into the till and take the item off the shelf.</div></div><div class="val"><button class="switch ${setOn('chan_tiktok',true)?'on':''}" data-swkey="chan_tiktok"></button></div></div>
+      <div class="set-row"><div><div class="t">WhatsApp catalogue</div><div class="d">Prices and stock counts refresh every hour.</div></div><div class="val"><button class="switch ${setOn('chan_whatsapp_catalogue',true)?'on':''}" data-swkey="chan_whatsapp_catalogue"></button></div></div>
+      <div class="set-row"><div><div class="t">Hide items that are out of stock</div><div class="d">So customers do not ask for what you do not have.</div></div><div class="val"><button class="switch ${setOn('chan_hide_out_of_stock',true)?'on':''}" data-swkey="chan_hide_out_of_stock"></button></div></div>
+      <div class="set-row"><div><div class="t">Next size reminder</div><div class="d">Messages a mum when her child is due the next size up.</div></div><div class="val"><button class="switch ${setOn('chan_next_size_reminder',true)?'on':''}" data-swkey="chan_next_size_reminder"></button></div></div>
+    </div>`;
+  }
+  if(setTab==='shop'){
+    body = `<div class="panel">
+      <div class="pt"><h3>Your team</h3><button class="btn sun sm" style="margin-left:auto">Add someone</button></div>
+      ${[['Wsheks','Owner','#39322e','All jobs'],['Njeri M.','Cashier','#ec7060','Signed in now, shift 2'],['Faith A.','Cashier','#ec7060','Off today'],['Brian O.','Stock clerk','#12995a','Deliveries only'],['Kevin M.','Rider','#f2a12a','Delivery updates only']].map(s=>`
+        <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${s[2]}">${s[0][0]}</div><div><div class="t">${s[0]}</div><div class="d">${s[1]} · ${s[3]}</div></div></div><div class="val"><button class="btn sm">Manage</button></div></div>`).join('')}
+      <div class="pt" style="border-top:1px solid var(--line2)"><h3>Running the shop</h3></div>
+      <div class="set-row"><div><div class="t">Warn me when stock runs low</div><div class="d">At 5 pieces left, on WhatsApp to the owner.</div></div><div class="val">5 pieces<button class="switch ${setOn('warn_low_stock',true)?'on':''}" data-swkey="warn_low_stock"></button></div></div>
+      <div class="set-row"><div><div class="t">Hold a reserved item for</div><div class="d">When a customer pays a deposit to hold something.</div></div><div class="val">7 days</div></div>
+      <div class="set-row"><div><div class="t">Must count cash before closing</div><div class="d">The till will not open tomorrow until today is counted.</div></div><div class="val"><button class="switch ${setOn('must_count_cash',true)?'on':''}" data-swkey="must_count_cash"></button></div></div>
+    </div>`;
+  }
+  if(setTab==='devices'){ body = devicesBody(); }
+  return `<div class="phead"><h2>Settings</h2><p>Everything about how the shop runs, in one place. You can change any of this from your phone when you are not in Utawala.</p></div>
+  <div class="set-grid">
+    <div class="set-nav">
+      ${tabs.map(t=>`<button class="${t[0]===setTab?'on':''}" data-set="${t[0]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${t[2]}</svg>${t[1]}</button>`).join('')}
+    </div>
+    <div>${body}</div>
+  </div>`;
+}
+
+/* -------- REPORTS: sales and transactions -------- */
+function reports(){
+  const total=TXNS.reduce((t,x)=>t+x.amt,0);
+  const count=TXNS.length;
+  const byM={'M-PESA':0,'Card':0,'Cash':0};
+  TXNS.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
+  const itemsSold=TXNS.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
+  const avg=Math.round(total/count);
+  const pct=v=>total?Math.round(v/total*100):0;
+  const cashExpected=3000+byM['Cash'];
+  const mpill={'M-PESA':'mpesa','Card':'card','Cash':'cash'};
+  const ranges=[['today','Today'],['yesterday','Yesterday'],['week','Last 7 days']];
+  return `<div class="phead"><h2>Sales and reports</h2><p>Everything you have taken and every sale that went through. Tap a sale to see what was in it and print the receipt again.</p></div>
+  <div class="chips" style="margin-bottom:16px">${ranges.map(r=>`<button class="chip ${repRange===r[0]?'on':''}" data-range="${r[0]}">${r[1]}</button>`).join('')}</div>
+  <div class="stats">
+    <div class="stat"><div class="l">Money taken</div><div class="v num">${money(total)}</div></div>
+    <div class="stat"><div class="l">Sales</div><div class="v num">${count}</div></div>
+    <div class="stat"><div class="l">Average sale</div><div class="v num">${money(avg)}</div></div>
+    <div class="stat"><div class="l">Items sold</div><div class="v num">${itemsSold}</div></div>
+  </div>
+  <div class="panel" style="padding:18px 20px">
+    <div class="pt" style="padding:0 0 12px"><h3>Money by method</h3></div>
+    <div class="mbar">
+      <span style="width:${pct(byM['M-PESA'])}%;background:var(--mpesa)"></span>
+      <span style="width:${pct(byM['Card'])}%;background:var(--blue)"></span>
+      <span style="width:${pct(byM['Cash'])}%;background:var(--sun)"></span>
+    </div>
+    <div class="mlegend">
+      <button class="mfilter ${repMethod==='M-PESA'?'on':''}" data-repmethod="M-PESA"><i class="d" style="background:var(--mpesa)"></i>M-PESA <b class="num">KSh ${money(byM['M-PESA'])}</b> (${pct(byM['M-PESA'])}%)</button>
+      <button class="mfilter ${repMethod==='Card'?'on':''}" data-repmethod="Card"><i class="d" style="background:var(--blue)"></i>Card <b class="num">KSh ${money(byM['Card'])}</b> (${pct(byM['Card'])}%)</button>
+      <button class="mfilter ${repMethod==='Cash'?'on':''}" data-repmethod="Cash"><i class="d" style="background:var(--sun)"></i>Cash <b class="num">KSh ${money(byM['Cash'])}</b> (${pct(byM['Cash'])}%)</button>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:16px">
+    <div class="pt"><h3>Today's sales${repMethod?' · '+repMethod:''}</h3><span class="badge">${TXNS.filter(x=>!repMethod||x.method===repMethod).length} sales</span>${repMethod?`<button class="btn sm" data-repmethod="all" style="margin-left:10px">Show all</button>`:''}</div>
+    <div style="padding:14px 16px">
+      ${TXNS.filter(x=>!repMethod||x.method===repMethod).length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">No ${repMethod} sales yet today.</div>`:''}
+      ${TXNS.map((x,i)=>{ if(repMethod&&x.method!==repMethod) return ''; return `<div class="txn ${openTxn===i?'open':''}">
+        <div class="txn-head" data-txn="${i}">
+          <div class="txn-time num">${x.t}</div>
+          <div class="txn-main"><div class="txn-ref">Sale ${x.ref} · ${x.cust}</div><div class="txn-sub">${x.items.reduce((a,it)=>a+it[1],0)} items · ${x.cashier}</div></div>
+          <span class="pill ${mpill[x.method]}">${x.method}</span>
+          <div class="txn-amt num">KSh ${money(x.amt)}</div>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        ${openTxn===i?`<div class="txn-body">
+          ${x.items.map(it=>`<div class="txn-line"><span>${it[1]} × ${it[0]}</span><span class="num">KSh ${money(it[1]*it[2])}</span></div>`).join('')}
+          <div class="txn-actions"><button class="btn sm">Print receipt again</button><button class="btn sm">Send on WhatsApp</button><button class="btn sm">Start a return</button></div>
+        </div>`:''}
+      </div>`; }).join('')}
+    </div>
+  </div>
+  <div class="panel" style="margin-top:16px">
+    <div class="pt"><h3>Close the day</h3></div>
+    <div class="set-row"><div><div class="t">Cash that should be in the drawer</div><div class="d">Opening float of 3,000 plus cash sales</div></div><div class="val num">KSh ${money(cashExpected)}</div></div>
+    <div class="set-row"><div><div class="t">M-PESA received to the till</div><div class="d">Buy Goods ${SHOP.till}</div></div><div class="val num">KSh ${money(byM['M-PESA'])}</div></div>
+    <div class="set-row"><div><div class="t">Card received</div><div class="d">Equity terminal</div></div><div class="val num">KSh ${money(byM['Card'])}</div></div>
+    <div style="padding:16px 20px"><button class="btn green">Count the cash and print the Z report</button></div>
+  </div>`;
+}
+
+/* -------- hardware: printers, scanner, barcode printer -------- */
+let DEVICES = { receipt:{connected:false,method:'usb',name:'',demo:false}, label:{connected:false,size:'40 x 30 mm',name:'',demo:false}, scanner:{enabled:true} };
+let lastScan='';
+function caps(){ const nav=(typeof navigator!=='undefined')?navigator:{}; const win=(typeof window!=='undefined')?window:{};
+  return { usb:('usb' in nav), bt:('bluetooth' in nav), serial:('serial' in nav), camera:!!(nav.mediaDevices&&nav.mediaDevices.getUserMedia), api:('BarcodeDetector' in win) }; }
+function toast(msg,bad){ const t=document.getElementById('toast'); if(!t) return; t.className='toast show'+(bad?' bad':''); t.textContent=msg; clearTimeout(window.__tt); window.__tt=setTimeout(()=>t.classList.remove('show'),1700); }
+function addToCart(p){ const ex=CART.find(l=>l.n===p.n&&l.a===p.a); if(ex)ex.q++; else CART.push({id:p.id,n:p.n,a:p.a,q:1,p:p.p,vt:p.vt}); }
+function handleScan(code){ code=(code||'').trim(); if(!code) return; lastScan=code;
+  const prod=PRODUCTS.find(p=>p.bc===code||(p.sku||'').toLowerCase()===code.toLowerCase()||p.n.toLowerCase()===code.toLowerCase());
+  if(view==='sell'){ if(prod){ addToCart(prod); render(); toast('Added '+prod.n); } else { toast('No product matches '+code,true); } }
+  else if(view==='settings'&&setTab==='devices'){ render(); toast(prod?('Read: '+prod.n):('Unknown code '+code),!prod); }
+  else { toast(prod?('Read: '+prod.n):('Unknown code '+code),!prod); }
+}
+async function connectPrinter(which,method){ const d=DEVICES[which]; try{
+    if(method==='usb'&&navigator.usb){ const dev=await navigator.usb.requestDevice({filters:[]}); d.name=dev.productName||'USB printer'; d.method='USB'; d.demo=false; }
+    else if(method==='bt'&&navigator.bluetooth){ const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true}); d.name=dev.name||'Bluetooth printer'; d.method='Bluetooth'; d.demo=false; }
+    else if(method==='serial'&&navigator.serial){ await navigator.serial.requestPort(); d.name='Serial printer'; d.method='Serial'; d.demo=false; }
+    else if(method==='network'){ d.name='Network printer'; d.method='Network'; d.demo=false; }
+    else { throw new Error('unsupported'); }
+    d.connected=true; toast('Printer connected');
+  }catch(err){ d.connected=true; d.demo=true; d.method=(method||'usb').toUpperCase(); d.name='Sample printer (demo)'; toast('Connected in demo mode'); }
+  render();
+}
+function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px;text-align:center;color:#98897d;font-family:Nunito,sans-serif;font-weight:700">No sales yet to print.</div>';
+  const registered=setOn('vat_registered',false);
+  const vat=(t.vat!==undefined&&t.vat!==null)?t.vat:0;
+  const dateStr=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const dot='border-top:2px dotted #e4d9c7';
+  const bag='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8z"/><path d="M8 7c-3 1-4 4-4 7v5a2 2 0 002 2h12a2 2 0 002-2v-5c0-3-1-6-4-7"/></svg>';
+  const mColor={'M-PESA':'#12995a','Cash':'#e08d10','Card':'#2f6be6','Split payment':'#7159c6'}[t.method]||'#6f645b';
+  const scallop=(dir)=>`<div style="height:11px;background:radial-gradient(circle at 8px ${dir==='top'?'11px':'0'}, transparent 7px, #fff 8px);background-size:16px 11px;background-repeat:repeat-x"></div>`;
+  return `<div style="width:330px;max-width:100%;margin:0 auto;font-family:Nunito,system-ui,sans-serif;color:#3a322e;filter:drop-shadow(0 12px 26px rgba(58,50,46,.16))">
+    ${scallop('top')}
+    <div style="background:#fff">
+      <div style="text-align:center;padding:20px 22px 14px;background:linear-gradient(180deg,#fffdf6,#fff)">
+        <div style="width:52px;height:52px;border-radius:15px;background:#f2a12a;box-shadow:0 4px 0 #e08d10;display:inline-grid;place-items:center;margin-bottom:10px">${bag}</div>
+        <div style="font-family:'Baloo 2',Nunito,sans-serif;font-weight:800;font-size:20px;letter-spacing:-.01em">${SHOP.name}</div>
+        <div style="color:#6f645b;font-weight:600;font-size:12.5px;margin-top:2px">${SHOP.branch}, Nairobi</div>
+        <div style="color:#98897d;font-weight:600;font-size:11px;margin-top:5px">Till ${SHOP.till} · KRA PIN ${SHOP.pin}</div>
+      </div>
+      <div style="text-align:center;padding:2px 22px 16px">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#e6f5ec;color:#12995a;font-weight:800;font-size:11.5px;letter-spacing:.06em;border-radius:999px;padding:5px 12px;margin-bottom:8px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>PAID</div>
+        <div style="font-family:'Baloo 2',Nunito,sans-serif;font-weight:800;font-size:33px;font-variant-numeric:tabular-nums;line-height:1">KSh ${money(t.amt)}</div>
+        <div style="color:#98897d;font-weight:600;font-size:12px;margin-top:4px">${dateStr} · ${t.t}</div>
+      </div>
+      <div style="padding:13px 22px;${dot}">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Receipt</span><span style="color:#3a322e">${t.ref||'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Served by</span><span style="color:#3a322e">${t.cashier||'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Customer</span><span style="color:#3a322e">${t.cust||'Walk-in'}</span></div>
+      </div>
+      <div style="padding:12px 22px;${dot}">
+        ${t.items.map(it=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><div style="font-weight:700;font-size:13.5px;line-height:1.35"><span style="color:#f2a12a;font-weight:800">${it[1]} ×</span> ${it[0]}</div><div style="font-weight:800;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap">${money(it[1]*it[2])}</div></div>`).join('')}
+      </div>
+      <div style="padding:14px 22px;${dot}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:800;font-size:14px">Total</span><span style="font-family:'Baloo 2',Nunito,sans-serif;font-weight:800;font-size:23px;font-variant-numeric:tabular-nums">KSh ${money(t.amt)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#98897d;margin-top:6px"><span>${!registered?'VAT':(vat>0?'Includes VAT':'VAT')}</span><span>${!registered?'Not registered':(vat>0?('KSh '+money(vat)):'None')}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><span style="font-size:12.5px;font-weight:700;color:#6f645b">Paid by</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:12.5px;color:${mColor}"><span style="width:8px;height:8px;border-radius:50%;background:${mColor}"></span>${t.method}</span></div>
+      </div>
+      <div style="padding:15px 22px 18px;${dot};text-align:center">
+        <div style="font-family:ui-monospace,'Courier New',monospace;font-size:23px;letter-spacing:1px;line-height:1;color:#3a322e">▏▍▏▎▍▏▊▏▎▍▏▍▏▎▍</div>
+        <div style="font-size:10px;color:#98897d;font-weight:600;letter-spacing:.1em;margin-top:4px">${t.ref||''} · ${SHOP.till}</div>
+        <div style="margin-top:12px;font-size:11.5px;color:#6f645b;font-weight:600;line-height:1.7">${!registered?'Not VAT registered<br>':''}${setOn('etims_receipts',true)?'A valid eTIMS tax receipt<br>':''}Swaps within 14 days with this receipt</div>
+        <div style="margin-top:10px;font-family:'Baloo 2',Nunito,sans-serif;font-weight:700;font-size:15px;color:#f2a12a">Asante sana, karibu tena</div>
+      </div>
+    </div>
+    ${scallop('bottom')}
+  </div>`;
+}
+function labelHTML(){ const p=PRODUCTS[0];
+  return `<div class="rcpt" style="max-width:210px;margin:0 auto"><div class="c" style="font-weight:bold">${SHOP.name}</div><div class="c">${p.n}</div><div class="c">${p.a}</div><div class="c" style="font-size:19px;font-weight:bold;margin:6px 0">KSh ${money(p.p)}</div><div class="c" style="letter-spacing:1px;font-size:26px;line-height:1">▏▍▏▎▍▏▊▏▎▍▏▍</div><div class="c">${p.bc}</div></div>`;
+}
+function openPrint(kind){ const m=document.getElementById('hwmodal'); if(!m) return; const inner=kind==='label'?labelHTML():receiptHTML();
+  m.innerHTML=`<div class="rcpt-wrap"><h3 style="margin-bottom:12px">${kind==='label'?'Test label':'Test receipt'}</h3>${inner}<div style="display:flex;gap:9px;margin-top:16px"><button class="btn green" style="flex:1" data-hw="print">Print</button><button class="btn" data-hw="close">Close</button></div></div>`;
+  window.__hwkind=kind; m.classList.add('show');
+}
+function devicesBody(){ const c=caps();
+  const capItem=(ok,label)=>`<div class="cap ${ok?'ok':'no'}"><span class="dot"></span>${label} ${ok?'ready':'not here'}</div>`;
+  const r=DEVICES.receipt, l=DEVICES.label;
+  const someBc=PRODUCTS.slice(0,3).map(p=>p.bc).join(', ');
+  return `<div class="panel"><div class="pt"><h3>What this device supports</h3><span class="badge">Checked live</span></div>
+    <div style="padding:16px 18px"><div class="caps">
+      ${capItem(c.usb,'USB printers')}${capItem(c.bt,'Bluetooth')}${capItem(c.serial,'Serial')}${capItem(c.camera,'Camera scan')}${capItem(c.api,'Built-in reader')}
+    </div><div style="font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">A browser cannot reach a printer on its own, so you tap Connect and choose the device once, then the till remembers it. A USB barcode scanner needs no setup, it types the code straight into the sale.</div></div>
+  </div>
+  <div class="panel" style="padding:16px 18px"><div class="pt" style="padding:0 0 12px"><h3>Devices</h3></div>
+    <div class="devcard"><div class="dh"><div class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg></div>
+      <div style="flex:1"><h4>Receipt printer</h4><div class="dsub">${r.connected?`${r.name} · over ${r.method}${r.demo?' · demo':''}`:'80mm thermal, for the customer receipt'}</div></div>
+      <span class="pill ${r.connected?'ok':'warn'}">${r.connected?'Connected':'Not connected'}</span></div>
+      <div class="drow"><select class="sel" id="rmethod"><option value="usb">USB cable</option><option value="bt">Bluetooth</option><option value="network">Network (IP)</option><option value="serial">Serial</option></select>
+      <button class="btn sun sm" data-dev="receipt-connect">${r.connected?'Reconnect':'Connect'}</button>
+      <button class="btn green sm" data-dev="receipt-test" ${r.connected?'':'disabled style="opacity:.5;pointer-events:none"'}>Test print</button></div>
+    </div>
+    <div class="devcard"><div class="dh"><div class="di" style="background:#e7effc;color:#215bb0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12M8 6v12M12 6v12M16 6v12M20 6v12"/></svg></div>
+      <div style="flex:1"><h4>Barcode scanner</h4><div class="dsub">A USB scanner works straight away, it types the code into the sale</div></div>
+      <span class="pill ok">Ready</span></div>
+      <div class="scan-test"><input id="scantest" placeholder="Scan or type a code, then Enter"><button class="btn sm" data-dev="scan-go">Test</button></div>
+      <div class="laststamp">Last code read: ${lastScan||'nothing yet'}</div>
+      <div style="font-size:12.5px;color:var(--mut);font-weight:600;margin-top:10px">Try a real product code: ${someBc}. On a tablet with no scanner, the camera can read barcodes instead.</div>
+    </div>
+    <div class="devcard"><div class="dh"><div class="di" style="background:#efe7f7;color:#6c4bb3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M6 8V5h12v3M6 16v3h12v-3"/></svg></div>
+      <div style="flex:1"><h4>Label and price tag printer</h4><div class="dsub">${l.connected?`${l.name} · ${l.size}${l.demo?' · demo':''}`:'Prints price tags with a barcode for new stock'}</div></div>
+      <span class="pill ${l.connected?'ok':'warn'}">${l.connected?'Connected':'Not connected'}</span></div>
+      <div class="drow"><select class="sel" id="lsize"><option>40 x 30 mm</option><option>50 x 30 mm</option><option>58 mm roll</option></select>
+      <button class="btn sun sm" data-dev="label-connect">${l.connected?'Reconnect':'Connect'}</button>
+      <button class="btn green sm" data-dev="label-test" ${l.connected?'':'disabled style="opacity:.5;pointer-events:none"'}>Print a test tag</button></div>
+    </div>
+  </div>`;
+}
+
+/* -------- runtime -------- */
+const VIEWS = {sell, checkout, orders, stock, reports, returns, settings};
+const TITLES = {
+  sell:['Good afternoon, Njeri','ilekela Baby & Kids, Utawala'],
+  checkout:['Take payment','ilekela Baby & Kids, Utawala'],
+  orders:['Online orders','ilekela Baby & Kids, Utawala'],
+  stock:['Products and stock','ilekela Baby & Kids, Utawala'],
+  reports:['Sales and reports','ilekela Baby & Kids, Utawala'],
+  returns:['Returns and swaps','ilekela Baby & Kids, Utawala'],
+  settings:['Settings','ilekela Baby & Kids, Utawala'],
+};
+let view = 'sell';
+const screen = document.getElementById('screen');
+
+const lockEl=document.getElementById('lock');
+function render(){
+  if(!currentUser){ lockEl.classList.add('show'); lockEl.innerHTML=lockScreen(); const u=document.getElementById('loginUser'); if(u) u.focus(); return; }
+  lockEl.classList.remove('show');
+  if(view!=='checkout' && !allowedNav().some(n=>n.key===view)){ const f=allowedNav()[0]; view=f?f.key:'sell'; }
+  document.getElementById('navlist').innerHTML = buildNav();
+  document.getElementById('meBox').innerHTML = `<div class="av" style="background:${currentUser.c}">${initials(currentUser.name)}</div><div><div class="nm">${currentUser.name}</div><div class="rl">${currentUser.role}</div></div>`;
+  document.getElementById('shiftBox').innerHTML = `<span class="dot"></span>${currentUser.name.split(' ')[0]} on the till`;
+  screen.innerHTML = VIEWS[view]();
+  const t=TITLES[view]||['',''];
+  // Top bar is a friendly greeting on every screen; each screen shows its own single title below.
+  document.getElementById('greet').textContent = 'Karibu, '+currentUser.name.split(' ')[0];
+  document.getElementById('subtitle').textContent = t[1] || (SHOP.name+', '+SHOP.branch);
+}
+document.querySelector('.rail').addEventListener('click',e=>{
+  const b=e.target.closest('.navbtn'); if(b){view=b.dataset.nav; render();}
+});
+screen.addEventListener('click',async e=>{
+  // open the payment step from the sale
+  const goto=e.target.closest('[data-goto]'); if(goto){ if(goto.dataset.goto==='checkout'){ if(CART.length===0) return; resetPay(); } view=goto.dataset.goto; render(); return; }
+
+  // payment step actions
+  const pay=e.target.closest('[data-pay]');
+  if(pay){ const a=pay.dataset.pay;
+    if(a==='back'){ view='sell'; render(); }
+    else if(a==='send'||a==='match'){ payStage='waiting'; render(); }
+    else if(a==='cardsend'){ payStage='cardsent'; render(); }
+    else if(a==='paid'){
+      paidAmount=dueT();
+      try{
+        const r=await api('/api/sales','POST',{
+          lines:CART.map(l=>({id:l.id,n:l.n,a:l.a,q:l.q,p:l.p})),
+          method:payMethod, discountPct:0, discountAmount:saleDiscount, total:dueT(),
+          customer:saleCustomer?saleCustomer.name:'Walk-in', cashier:currentUser?currentUser.name:'',
+          splitParts:payMethod==='split'?splitParts:null, channel:'counter'
+        });
+        PRODUCTS=r.products; TXNS.unshift(r.sale);
+      }catch(err){ toast('Paid on screen, but the sale did not reach the server',true); }
+      payStage='done'; render();
+    }
+    else if(a==='newsale'){ CART=[]; resetPay(); view='sell'; render(); }
+    return;
+  }
+  const pm=e.target.closest('[data-pm]'); if(pm){ payMethod=pm.dataset.pm; payStage='choose'; cashGiven=0; splitParts=[]; render(); return; }
+  const cash=e.target.closest('[data-cash]'); if(cash){ cashGiven=+cash.dataset.cash; render(); return; }
+  const sp=e.target.closest('[data-split]'); if(sp){ const remain=Math.max(0,subT()-splitParts.reduce((t,x)=>t+x.amt,0)); splitParts.push(sp.dataset.split==='mpesa'?{label:'M-PESA',amt:Math.min(remain,5000)}:{label:'Cash',amt:remain}); render(); return; }
+
+  // cart actions on the sell screen
+  const add=e.target.closest('[data-add]'); if(add){ const p=PRODUCTS[+add.dataset.add]; const ex=CART.find(l=>l.n===p.n&&l.a===p.a); if(ex)ex.q++; else CART.push({id:p.id,n:p.n,a:p.a,q:1,p:p.p,vt:p.vt}); render(); return; }
+  const inc=e.target.closest('[data-inc]'); if(inc){ CART[+inc.dataset.inc].q++; render(); return; }
+  const dec=e.target.closest('[data-dec]'); if(dec){ const i=+dec.dataset.dec; CART[i].q--; if(CART[i].q<1)CART.splice(i,1); render(); return; }
+  const clr=e.target.closest('[data-clear]'); if(clr){ CART=[]; render(); return; }
+
+  // stock: products / deliveries / add product / accept delivery
+  const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
+  const sfl=e.target.closest('[data-stockfilter]'); if(sfl){ const f=sfl.dataset.stockfilter; stockFilter=(f==='all'||stockFilter===f)?null:f; render(); return; }
+  const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; render(); return; }
+  const cancp=e.target.closest('[data-cancelprod]'); if(cancp){ addingProduct=false; render(); return; }
+  const savp=e.target.closest('[data-saveprod]'); if(savp){
+    const g=id=>document.getElementById(id), val=id=>{const e=g(id);return e?e.value:'';}, num=v=>parseInt((v||'').replace(/\D/g,''))||0;
+    const name=(g('np-name').value||'').trim(); if(!name){ g('np-name').focus(); return; }
+    const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
+    const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const body={ n:name, a:(g('np-age').value||'').trim()||'All ages', p:num(g('np-price').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
+      category:(val('np-category')||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
+      online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
+    try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
+    catch(err){ toast('Could not save the product',true); return; }
+    addingProduct=false; render(); return;
+  }
+  const acc=e.target.closest('[data-accept-delivery]'); if(acc){
+    if(DELIVERY){
+      try{ const r=await api('/api/deliveries/'+DELIVERY.id+'/accept','POST'); PRODUCTS=r.products; justReceived=r.added; INTAKE=r.intake; DELIVERY=r.delivery; }
+      catch(err){ toast('Could not accept the delivery',true); return; }
+    }
+    stockTab='products'; render(); return;
+  }
+  // reports: range + open a transaction + filter by payment method
+  const range=e.target.closest('[data-range]'); if(range){ repRange=range.dataset.range; render(); return; }
+  const rpm=e.target.closest('[data-repmethod]'); if(rpm){ const m=rpm.dataset.repmethod; repMethod=(m==='all'||repMethod===m)?null:m; render(); return; }
+  const txn=e.target.closest('[data-txn]'); if(txn){ const i=+txn.dataset.txn; openTxn=(openTxn===i?-1:i); render(); return; }
+
+  // online orders: filter by a status card (click again, or Show all, to clear)
+  const ofl=e.target.closest('[data-ordfilter]'); if(ofl){ const f=ofl.dataset.ordfilter; orderFilter=(f==='all'||orderFilter===f)?null:f; render(); return; }
+  // online orders: remove / cancel an order (e.g. one that never gets paid)
+  const odm=e.target.closest('[data-orddismiss]'); if(odm){ const o=ORDERS[+odm.dataset.orddismiss]; if(o && confirm('Remove this order from the list? This cannot be undone.')){ try{ await api('/api/orders/'+o.id,'DELETE'); ORDERS=ORDERS.filter(x=>x!==o); toast('Order removed'); }catch(err){ toast('Could not remove the order',true); } render(); } return; }
+  // online orders: advance status
+  const on=e.target.closest('[data-ordnext]'); if(on){ const o=ORDERS[+on.dataset.ordnext]; const flow={new:'packed',packed:'rider',rider:'delivered'}; const ns=flow[o.st]||o.st; o.st=ns; try{ await api('/api/orders/'+o.id,'PATCH',{st:ns}); }catch(err){ toast('Status saved on screen only',true); } render(); return; }
+
+  // parked sales, hold and reserve
+  const pk=e.target.closest('[data-parked]'); if(pk){ showParked=(pk.dataset.parked==='open'); render(); return; }
+  const hold=e.target.closest('[data-hold]'); if(hold){ if(CART.length){ try{ const r=await api('/api/held','POST',{type:'hold',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Held just now'}); HELD.unshift(r.held); CART=[]; }catch(err){ toast('Could not park the sale',true); } } render(); return; }
+  const res=e.target.closest('[data-reserve]'); if(res){ if(CART.length){ const dep=Math.round(subT()*0.3/100)*100; try{ const r=await api('/api/held','POST',{type:'reserve',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:dep,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Reserved just now'}); HELD.unshift(r.held); CART=[]; }catch(err){ toast('Could not reserve the sale',true); } } render(); return; }
+  const rsm=e.target.closest('[data-resume]'); if(rsm){ const item=HELD[+rsm.dataset.resume]; if(CART.length){ try{ const r=await api('/api/held','POST',{type:'hold',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Held just now'}); HELD.push(r.held); }catch(err){} } CART=item.lines.map(l=>({...l})); if(item.id!=null){ try{ await api('/api/held/'+item.id,'DELETE'); }catch(err){} } HELD=HELD.filter(h=>h!==item); showParked=false; render(); return; }
+  const drp=e.target.closest('[data-drop]'); if(drp){ const item=HELD[+drp.dataset.drop]; HELD.splice(+drp.dataset.drop,1); if(item&&item.id!=null){ try{ await api('/api/held/'+item.id,'DELETE'); }catch(err){} } render(); return; }
+
+  // discount and manager approval
+  const dsc=e.target.closest('[data-disc]'); if(dsc){ saleDiscount=0; discPending=0; render(); return; }
+  const dapy=e.target.closest('[data-discapply]'); if(dapy){ const el=document.getElementById('discIn'); applyDiscount(parseInt((el&&el.value||'').replace(/\D/g,''))||0); render(); return; }
+  const dap=e.target.closest('[data-discapprove]'); if(dap){ const el=document.getElementById('mgrpin'); const v=(el&&el.value||'').replace(/\\D/g,''); if(v.length>=4){ saleDiscount=discPending; discPending=0; render(); } else if(el){ el.focus(); } return; }
+  const dcn=e.target.closest('[data-disccancel]'); if(dcn){ discPending=0; render(); return; }
+
+  // devices: printers and scanner
+  const dev=e.target.closest('[data-dev]');
+  if(dev){ const a=dev.dataset.dev;
+    if(a==='receipt-connect'){ const mth=(document.getElementById('rmethod')||{}).value||'usb'; connectPrinter('receipt',mth); }
+    else if(a==='receipt-test'){ openPrint('receipt'); }
+    else if(a==='label-connect'){ const sz=(document.getElementById('lsize')||{}).value; if(sz) DEVICES.label.size=sz; connectPrinter('label','usb'); }
+    else if(a==='label-test'){ openPrint('label'); }
+    else if(a==='scan-go'){ const el=document.getElementById('scantest'); const v=el?el.value:''; if(v){ handleScan(v); if(el) el.value=''; } }
+    return;
+  }
+
+  // settings and generic controls
+  const set=e.target.closest('[data-set]'); if(set){setTab=set.dataset.set; render(); return;}
+  // settings: save the VAT rate to the server
+  const svat=e.target.closest('[data-savevat]'); if(svat){ const el=document.getElementById('vatInput'); let v=parseInt((el&&el.value||'').replace(/\D/g,'')); if(!Number.isFinite(v)||v<0||v>100){ toast('VAT rate must be a whole number from 0 to 100',true); if(el)el.focus(); return; } try{ const r=await api('/api/settings','PATCH',{vat_rate:v}); if(r.shop&&r.shop.vat_rate!==undefined)SHOP.vat=Number(r.shop.vat_rate); toast('VAT rate saved: '+SHOP.vat+'%'); }catch(err){ toast('Could not save the VAT rate',true); } render(); return; }
+  // stock: change a product's VAT status (standard / exempt)
+  const pvat=e.target.closest('[data-prodvat]'); if(pvat){ const id=+pvat.dataset.prodvat; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.vt==='exempt'?'standard':'exempt'; try{ const r=await api('/api/products/'+id,'PATCH',{vat_type:next}); if(r.product){ Object.assign(prod,r.product); } toast(next==='exempt'?'Marked VAT exempt':'Marked standard VAT'); }catch(err){ toast('Could not change VAT status',true); } render(); } return; }
+  // stock: put a product on / off the shop website
+  const ponl=e.target.closest('[data-prodonline]'); if(ponl){ const id=+ponl.dataset.prodonline; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.online!==0?0:1; try{ const r=await api('/api/products/'+id,'PATCH',{online:next}); if(r.product){ Object.assign(prod,r.product); } toast(next?'Now on the website':'Taken off the website'); }catch(err){ toast('Could not change website status',true); } render(); } return; }
+  // channels: publish the catalogue to the website
+  const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
+  const sw=e.target.closest('.switch'); if(sw){
+    const key=sw.dataset.swkey;
+    if(key){ const now=!sw.classList.contains('on'); SETTINGS[key]=now?'1':'0'; try{ await api('/api/settings','PATCH',{[key]: now?'1':'0'}); }catch(err){ SETTINGS[key]=now?'0':'1'; toast('Could not save the setting',true); } render(); }
+    else { sw.classList.toggle('on'); }   // rights-grid toggles stay on-screen only for now
+    return;
+  }
+  const chip=e.target.closest('.chip'); if(chip){chip.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); chip.classList.add('on'); return;}
+});
+screen.addEventListener('input',e=>{
+  if(e.target.id==='cashin'){ cashGiven=parseInt(e.target.value.replace(/\D/g,''))||0;
+    const total=dueT(), change=Math.max(0,cashGiven-total), enough=cashGiven>=total;
+    const box=screen.querySelector('.changebox'); const btn=screen.querySelector('[data-pay="paid"]');
+    if(box){ box.style.background=enough?'var(--mpesa-t)':'#f6efe3'; const b=box.querySelector('b'); if(b){b.textContent='KSh '+money(change); b.style.color=enough?'var(--mpesa)':'var(--mut)';} }
+    if(btn){ enough?btn.removeAttribute('disabled'):btn.setAttribute('disabled',''); }
+  }
+});
+// apply a typed discount when the cashier leaves the field (tab/click away or Enter blur)
+screen.addEventListener('change',e=>{
+  if(e.target.id==='discIn'){ applyDiscount(parseInt((e.target.value||'').replace(/\D/g,''))||0); render(); }
+});
+// Enter inside the discount field applies it straight away
+screen.addEventListener('keydown',e=>{
+  if(e.target.id==='discIn' && e.key==='Enter'){ e.preventDefault(); applyDiscount(parseInt((e.target.value||'').replace(/\D/g,''))||0); render(); }
+});
+// login: username and password, checked on the server
+lockEl.addEventListener('submit',e=>{ if(e.target.id==='loginForm'){ e.preventDefault(); doLogin(); } });
+document.getElementById('signOut').addEventListener('click',()=>{ currentUser=null; loginUserVal=''; loginError=''; try{ localStorage.removeItem('babypos_user'); }catch(e){} view='sell'; resetPay(); showParked=false; render(); });
+
+// hardware print preview
+document.getElementById('hwmodal').addEventListener('click',e=>{
+  const hw=e.target.closest('[data-hw]');
+  if(!hw){ if(e.target.id==='hwmodal') e.target.classList.remove('show'); return; }
+  if(hw.dataset.hw==='close'){ document.getElementById('hwmodal').classList.remove('show'); return; }
+  if(hw.dataset.hw==='print'){
+    const k=window.__hwkind||'receipt';
+    const w=window.open('','_blank','width=360,height=620');
+    if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); }
+    else{
+      const css='<style>body{font-family:ui-monospace,Courier New,monospace;margin:0;padding:12px}.rcpt{font-size:12px;line-height:1.7;color:#222}.rcpt .c{text-align:center}.rcpt .hr{border-top:1px dashed #999;margin:8px 0}.rcpt .row{display:flex;justify-content:space-between;gap:8px}</style>';
+      w.document.write('<!doctype html><html><head><title>'+k+'</title>'+css+'</head><body>'+(k==='label'?labelHTML():receiptHTML())+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},200)}<'+'/script></body></html>');
+      w.document.close();
+    }
+    document.getElementById('hwmodal').classList.remove('show');
+  }
+});
+// barcode scanner: keyboard wedge, and Enter inside a search or scan field
+let wedgeBuf='', wedgeLast=0;
+document.addEventListener('keydown',e=>{
+  if(!currentUser) return;
+  const el=e.target, tag=(el.tagName||'').toLowerCase();
+  const inField=(tag==='input'||tag==='textarea'||tag==='select');
+  if(e.key==='Enter'){
+    if(inField){
+      if(el.id==='scantest'||(el.classList&&el.classList.contains('search'))){ const v=el.value; if(v){ handleScan(v); el.value=''; e.preventDefault(); } }
+      wedgeBuf=''; return;
+    }
+    if(wedgeBuf.length>=3) handleScan(wedgeBuf);
+    wedgeBuf=''; return;
+  }
+  const now=Date.now(); if(now-wedgeLast>100) wedgeBuf=''; wedgeLast=now;
+  if(!inField && e.key.length===1) wedgeBuf+=e.key;
+});
+
+// help drawer
+const bg=document.getElementById('drawerBg'), dr=document.getElementById('drawer');
+function openHelp(){bg.classList.add('show');dr.classList.add('show');}
+function closeHelp(){bg.classList.remove('show');dr.classList.remove('show');}
+document.getElementById('helpOpen').addEventListener('click',openHelp);
+document.getElementById('helpClose').addEventListener('click',closeHelp);
+bg.addEventListener('click',closeHelp);
+
+// Load the shop's data from the backend, then show the till.
+async function boot(){
+  try{
+    const d=await api('/api/bootstrap');
+    if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null;
+  }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
+  // Stay signed in through a refresh: restore the last signed-in user if there is one.
+  try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}
+  render();
+}
+boot();
+</script>
+</body>
+</html>
