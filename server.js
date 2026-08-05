@@ -90,6 +90,15 @@ function heldOut(h) {
 function allHeld() {
   return db.prepare('SELECT * FROM held_sales ORDER BY id DESC').all().map(heldOut);
 }
+// Staff list for the Settings screen — never includes passwords.
+function allStaffPublic() {
+  return db.prepare('SELECT id, name, username, role, color FROM staff ORDER BY id')
+    .all().map(s => ({ id: s.id, name: s.name, username: s.username, role: s.role, c: s.color }));
+}
+function isOwnerPassword(pw) {
+  const row = db.prepare("SELECT 1 FROM staff WHERE role = 'Owner' AND password = ? LIMIT 1").get(String(pw || ''));
+  return !!row;
+}
 function orderOut(o) {
   return { id: o.id, ch: o.channel, cust: o.customer, area: o.area,
            items: JSON.parse(o.items || '[]'), amt: o.amount,
@@ -338,9 +347,23 @@ const server = http.createServer(async (req, res) => {
         held: allHeld(),
         orders: allOrders(),
         returns: allReturns(),
+        staff: allStaffPublic(),
         intake: del.intake,
         delivery: del.delivery,
       });
+    }
+
+    // Change your own password (needs your current one).
+    if (p === '/api/password' && method === 'POST') {
+      const body = await readBody(req);
+      const uname = String(body.username || '').trim().toLowerCase();
+      const cur = String(body.currentPassword || '');
+      const next = String(body.newPassword || '');
+      if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
+      const row = db.prepare('SELECT * FROM staff WHERE lower(username) = ?').get(uname);
+      if (!row || row.password !== cur) return sendJSON(res, 401, { error: 'Your current password is wrong' });
+      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(next, row.id);
+      return sendJSON(res, 200, { ok: true });
     }
 
     if (p === '/api/login' && method === 'POST') {
@@ -401,6 +424,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     let m;
+    // Owner resets a staff member's password (confirmed with the owner's own password).
+    if ((m = p.match(/^\/api\/staff\/(\d+)\/password$/)) && method === 'POST') {
+      const body = await readBody(req);
+      const next = String(body.newPassword || '');
+      if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
+      if (!isOwnerPassword(body.ownerPassword)) return sendJSON(res, 401, { error: 'Owner password is wrong' });
+      const target = db.prepare('SELECT * FROM staff WHERE id = ?').get(Number(m[1]));
+      if (!target) return sendJSON(res, 404, { error: 'no such staff member' });
+      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(next, target.id);
+      return sendJSON(res, 200, { ok: true, name: target.name });
+    }
+
     // Update a product: VAT status, website catalogue fields, online/featured flags.
     if ((m = p.match(/^\/api\/products\/(\d+)$/)) && method === 'PATCH') {
       const body = await readBody(req);

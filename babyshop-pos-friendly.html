@@ -352,6 +352,10 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .login-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--sun-d)}
 .login-btn svg{width:20px;height:20px}
 .login-err{background:var(--stop-t);color:var(--stop);font-weight:700;font-size:13.5px;border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center}
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{width:100%;padding-right:70px}
+.pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--ink2);font-weight:800;font-size:12px;cursor:pointer;padding:7px 9px;border-radius:9px}
+.pw-eye:hover{background:var(--sun-t);color:var(--ink)}
 
 /* nav badge */
 .navbtn{position:relative}
@@ -543,8 +547,12 @@ async function api(path, method='GET', body){
 }
 const SHOP = { name:'ilekela Baby & Kids', branch:'Utawala', till:'5297841', pin:'P052xxxxxxG', vat:16 };
 let SETTINGS = {};   // raw shop settings from the server (toggles etc.)
+let STAFF_LIST = []; // staff list from the server (no passwords), for Settings
+let staffPwEdit = null; // which staff member's password is being set inline
 // Is a saved on/off setting enabled? Falls back to a sensible default when never saved.
 function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'||v===1||v===true) : def; }
+// A password box with a Show/Hide eye button.
+function pwInput(id){ return `<div class="pw-wrap"><input id="${id}" type="password" autocomplete="off" autocapitalize="none"><button type="button" class="pw-eye" data-eye="${id}">Show</button></div>`; }
 const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
 
 let PRODUCTS = [];   // loaded from the backend in boot()
@@ -632,7 +640,7 @@ function lockScreen(){
     <div class="sub">Sign in to open the till</div>
     <form class="login-form" id="loginForm">
       <div class="login-field"><label for="loginUser">Username</label><input id="loginUser" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. wsheks" value="${loginUserVal.replace(/"/g,'&quot;')}"></div>
-      <div class="login-field"><label for="loginPass">Password</label><input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Your password"></div>
+      <div class="login-field"><label for="loginPass">Password</label><div class="pw-wrap"><input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Your password"><button type="button" class="pw-eye" data-eye="loginPass">Show</button></div></div>
       ${loginError?`<div class="login-err">${loginError}</div>`:''}
       <button type="submit" class="login-btn">Sign in ${arrow}</button>
     </form>
@@ -1111,11 +1119,21 @@ function settings(){
     </div>`;
   }
   if(setTab==='shop'){
-    body = `<div class="panel">
-      <div class="pt"><h3>Your team</h3><button class="btn sun sm" style="margin-left:auto">Add someone</button></div>
-      ${[['Wsheks','Owner','#39322e','All jobs'],['Njeri M.','Cashier','#ec7060','Signed in now, shift 2'],['Faith A.','Cashier','#ec7060','Off today'],['Brian O.','Stock clerk','#12995a','Deliveries only'],['Kevin M.','Rider','#f2a12a','Delivery updates only']].map(s=>`
-        <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${s[2]}">${s[0][0]}</div><div><div class="t">${s[0]}</div><div class="d">${s[1]} · ${s[3]}</div></div></div><div class="val"><button class="btn sm">Manage</button></div></div>`).join('')}
-      <div class="pt" style="border-top:1px solid var(--line2)"><h3>Running the shop</h3></div>
+    body = `<div class="panel" style="margin-bottom:16px">
+      <div class="pt"><h3>Change my password</h3></div>
+      <div class="field"><label>Current password</label>${pwInput('cpw-cur')}</div>
+      <div class="field"><label>New password (at least 4 characters)</label>${pwInput('cpw-new')}</div>
+      <div style="padding:0 20px 16px"><button class="btn green sm" data-changepw>Save my new password</button></div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="pt"><h3>Your team</h3></div>
+      ${STAFF_LIST.map(s=>`
+        <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${s.c||'#ec7060'}">${(s.name||'?')[0]}</div><div><div class="t">${s.name}</div><div class="d">${s.role} · ${s.username||''}</div></div></div><div class="val">${can(9)?`<button class="btn sm" data-staffpw="${s.id}">Set password</button>`:'<span style="color:var(--mut);font-size:12.5px">Owner only</span>'}</div></div>
+        ${staffPwEdit===s.id?`<div class="set-row" style="background:#fffdf7"><div style="flex:1;min-width:0"><div class="field" style="padding:0 0 10px"><label>New password for ${s.name}</label>${pwInput('spw-new')}</div><div class="field" style="padding:0"><label>Your owner password (to confirm)</label>${pwInput('spw-owner')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn green sm" data-staffpwsave="${s.id}">Save</button><button class="btn sm" data-staffpwcancel>Cancel</button></div></div>`:''}`).join('')}
+      <div style="padding:14px 20px;font-size:12.5px;color:var(--mut);font-weight:600">Setting a staff member's password needs your owner password to confirm. Adding brand-new staff members comes later.</div>
+    </div>
+    <div class="panel">
+      <div class="pt"><h3>Running the shop</h3></div>
       <div class="set-row"><div><div class="t">Warn me when stock runs low</div><div class="d">At 5 pieces left, on WhatsApp to the owner.</div></div><div class="val">5 pieces<button class="switch ${setOn('warn_low_stock',true)?'on':''}" data-swkey="warn_low_stock"></button></div></div>
       <div class="set-row"><div><div class="t">Hold a reserved item for</div><div class="d">When a customer pays a deposit to hold something.</div></div><div class="val">7 days</div></div>
       <div class="set-row"><div><div class="t">Must count cash before closing</div><div class="d">The till will not open tomorrow until today is counted.</div></div><div class="val"><button class="switch ${setOn('must_count_cash',true)?'on':''}" data-swkey="must_count_cash"></button></div></div>
@@ -1438,6 +1456,12 @@ screen.addEventListener('click',async e=>{
   const ponl=e.target.closest('[data-prodonline]'); if(ponl){ const id=+ponl.dataset.prodonline; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.online!==0?0:1; try{ const r=await api('/api/products/'+id,'PATCH',{online:next}); if(r.product){ Object.assign(prod,r.product); } toast(next?'Now on the website':'Taken off the website'); }catch(err){ toast('Could not change website status',true); } render(); } return; }
   // channels: publish the catalogue to the website
   const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
+  // settings: change my own password
+  const cpw=e.target.closest('[data-changepw]'); if(cpw){ const cur=(document.getElementById('cpw-cur')||{}).value||''; const nw=(document.getElementById('cpw-new')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ await api('/api/password','POST',{username:currentUser.username,currentPassword:cur,newPassword:nw}); toast('Your password is changed'); }catch(err){ toast(err.message||'Could not change password',true); } return; }
+  // settings: owner opens / cancels / saves a staff member's password
+  const spw=e.target.closest('[data-staffpw]'); if(spw){ staffPwEdit=+spw.dataset.staffpw; render(); return; }
+  const spwc=e.target.closest('[data-staffpwcancel]'); if(spwc){ staffPwEdit=null; render(); return; }
+  const spws=e.target.closest('[data-staffpwsave]'); if(spws){ const id=+spws.dataset.staffpwsave; const nw=(document.getElementById('spw-new')||{}).value||''; const op=(document.getElementById('spw-owner')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ const r=await api('/api/staff/'+id+'/password','POST',{newPassword:nw,ownerPassword:op}); staffPwEdit=null; toast('Password set for '+(r.name||'that person')); render(); }catch(err){ toast(err.message||'Could not set the password',true); } return; }
   const sw=e.target.closest('.switch'); if(sw){
     const key=sw.dataset.swkey;
     if(key){ const now=!sw.classList.contains('on'); SETTINGS[key]=now?'1':'0'; try{ await api('/api/settings','PATCH',{[key]: now?'1':'0'}); }catch(err){ SETTINGS[key]=now?'0':'1'; toast('Could not save the setting',true); } render(); }
@@ -1464,6 +1488,8 @@ screen.addEventListener('keydown',e=>{
 });
 // login: username and password, checked on the server
 lockEl.addEventListener('submit',e=>{ if(e.target.id==='loginForm'){ e.preventDefault(); doLogin(); } });
+// Show/hide password eye buttons (login and settings)
+document.addEventListener('click',e=>{ const eye=e.target.closest('[data-eye]'); if(!eye) return; const inp=document.getElementById(eye.dataset.eye); if(!inp) return; if(inp.type==='password'){ inp.type='text'; eye.textContent='Hide'; } else { inp.type='password'; eye.textContent='Show'; } });
 document.getElementById('signOut').addEventListener('click',()=>{ currentUser=null; loginUserVal=''; loginError=''; try{ localStorage.removeItem('babypos_user'); }catch(e){} view='sell'; resetPay(); showParked=false; render(); });
 
 // hardware print preview
@@ -1514,7 +1540,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null;
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[];
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}
