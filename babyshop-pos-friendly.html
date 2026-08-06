@@ -734,7 +734,7 @@ function orders(){
   const inFilter=o=> !orderFilter ? true : (orderFilter==='await' ? o.pay==='await' : o.st===orderFilter);
   const shownCount=ORDERS.filter(inFilter).length;
   const activeCard=cards.find(c=>c[0]===orderFilter);
-  return `<div class="phead"><h2>Online orders</h2><p>Orders from WhatsApp and TikTok Shop land here. Pack them, hand them to a rider, and mark them delivered. Paid orders take the item off the shelf automatically.</p></div>
+  return `<div class="phead"><h2>Online orders</h2><p>Orders from WhatsApp land here. Pack them, hand them to a rider, and mark them delivered. Paid orders take the item off the shelf automatically.</p></div>
   <div class="stats">
     ${cards.map(c=>`<button class="stat stat-btn ${orderFilter===c[0]?'on':''}" data-ordfilter="${c[0]}"><div class="l">${c[1]}</div><div class="v num">${c[2]}</div></button>`).join('')}
   </div>
@@ -1169,7 +1169,6 @@ function settings(){
     </div>
     <div class="panel">
       <div class="pt"><h3>Selling online</h3></div>
-      <div class="set-row"><div><div class="t">TikTok Shop orders</div><div class="d">Orders drop into the till and take the item off the shelf.</div></div><div class="val"><button class="switch ${setOn('chan_tiktok',true)?'on':''}" data-swkey="chan_tiktok"></button></div></div>
       <div class="set-row"><div><div class="t">WhatsApp catalogue</div><div class="d">Prices and stock counts refresh every hour.</div></div><div class="val"><button class="switch ${setOn('chan_whatsapp_catalogue',true)?'on':''}" data-swkey="chan_whatsapp_catalogue"></button></div></div>
       <div class="set-row"><div><div class="t">Hide items that are out of stock</div><div class="d">So customers do not ask for what you do not have.</div></div><div class="val"><button class="switch ${setOn('chan_hide_out_of_stock',true)?'on':''}" data-swkey="chan_hide_out_of_stock"></button></div></div>
       <div class="set-row"><div><div class="t">Next size reminder</div><div class="d">Messages a mum when her child is due the next size up.</div></div><div class="val"><button class="switch ${setOn('chan_next_size_reminder',true)?'on':''}" data-swkey="chan_next_size_reminder"></button></div></div>

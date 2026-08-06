@@ -272,9 +272,7 @@ function seed() {
     // --- online orders ---
     const ORDERS = [
       { code: 'WA-2207', ch: 'wa', cust: 'Mercy A.', area: 'Utawala', items: [['Warm hooded jacket, 8 to 10 years', 1]], amt: 4200, pay: 'paid', st: 'new', t: '12 min ago' },
-      { code: 'TT-8841', ch: 'tt', cust: 'TikTok buyer @njxri', area: 'Kasarani', items: [['Two piece tracksuit, 6 to 7 years', 1], ['Ribbed socks, 5 pack', 1]], amt: 4000, pay: 'paid', st: 'packed', t: '40 min ago' },
       { code: 'WA-2206', ch: 'wa', cust: 'Faith N.', area: 'Ruai', items: [['Cot blanket, Newborn to 2y', 1]], amt: 2600, pay: 'await', st: 'new', t: '1 hr ago' },
-      { code: 'TT-8837', ch: 'tt', cust: 'TikTok buyer @mamak', area: 'Embakasi', items: [['Knit sweater dress, 3 to 4 years', 1]], amt: 2900, pay: 'paid', st: 'rider', t: '2 hr ago' },
       { code: 'WA-2201', ch: 'wa', cust: 'Grace W.', area: 'Utawala', items: [['Denim trousers, 4 to 5 years', 1], ['Soft sole baby shoes', 1]], amt: 3700, pay: 'paid', st: 'delivered', t: 'Yesterday' },
     ];
     const insOrder = db.prepare(

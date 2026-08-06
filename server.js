@@ -121,7 +121,8 @@ function orderOut(o) {
            pay: o.pay_status, st: o.fulfil_status, t: o.t };
 }
 function allOrders() {
-  return db.prepare('SELECT * FROM orders ORDER BY id').all().map(orderOut);
+  // TikTok Shop is hidden for now (channel 'tt'); WhatsApp only. Re-enable by dropping the filter.
+  return db.prepare("SELECT * FROM orders WHERE channel != 'tt' ORDER BY id").all().map(orderOut);
 }
 function allReturns() {
   return db.prepare('SELECT * FROM returns ORDER BY id').all().map(r =>
