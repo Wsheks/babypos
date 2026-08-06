@@ -9,19 +9,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --paper:#faf6ee; --card:#ffffff; --ink:#3a322e; --ink2:#6f645b; --mut:#98897d;
-  --line:#ede3d4; --line2:#f3ecdf;
-  --sun:#f2a12a; --sun-d:#e08d10; --sun-t:#fdefd7;
+  /* ilekela brand palette: teal (structure), red (actions/prices), yellow, green */
+  --paper:#f4f8f9; --card:#ffffff; --ink:#14424f; --ink2:#4d6f78; --mut:#8aa4ab;
+  --line:#dfeaed; --line2:#eef5f6;
+  --sun:#1e7f9b; --sun-d:#155f74; --sun-t:#e2f1f5;
   --mpesa:#12995a; --mpesa-t:#e6f5ec;
   --blue:#2f6be6; --blue-t:#e7effc;
-  --coral:#ec7060; --coral-t:#fdecea;
-  --ok:#2c9a67; --warn:#c07a12; --warn-t:#fbf0da; --stop:#c94236; --stop-t:#fbe9e7;
+  --coral:#e8503a; --coral-t:#fdeae6;
+  --ok:#5f8f28; --warn:#b0781a; --warn-t:#fbf1da; --stop:#d64a37; --stop-t:#fbe9e7;
   --r:20px; --r-s:14px;
   --shadow:0 1px 2px rgba(58,50,46,.04),0 6px 16px rgba(58,50,46,.06); --shadow-l:0 10px 30px rgba(58,50,46,.14),0 2px 6px rgba(58,50,46,.06);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{background:radial-gradient(1100px 520px at 100% -8%,#fdf6e9,transparent 60%),radial-gradient(900px 500px at -10% 0%,#fbeee0,transparent 55%),var(--paper);background-attachment:fixed;color:var(--ink);font-family:Nunito,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
+body{background:radial-gradient(1100px 520px at 100% -8%,#e4f2f5,transparent 60%),radial-gradient(900px 500px at -10% 0%,#eaf5ee,transparent 55%),var(--paper);background-attachment:fixed;color:var(--ink);font-family:Nunito,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
 button{font-family:inherit;cursor:pointer}
 .num{font-variant-numeric:tabular-nums}
 h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
@@ -41,8 +42,8 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .navbtn:hover{background:var(--sun-t);color:var(--ink)}
 .navbtn:hover svg{transform:translateY(-2px)}
 .navbtn:active{transform:translateY(1px)}
-.navbtn.on{background:linear-gradient(180deg,#f6ad3c,var(--sun));color:#fff;box-shadow:0 8px 18px rgba(224,141,16,.34)}
-.navbtn.on:hover{background:linear-gradient(180deg,#f6ad3c,var(--sun));color:#fff}
+.navbtn.on{background:linear-gradient(180deg,#46aac6,var(--sun));color:#fff;box-shadow:0 8px 18px rgba(21,95,116,.34)}
+.navbtn.on:hover{background:linear-gradient(180deg,#46aac6,var(--sun));color:#fff}
 .navbtn.on:hover svg{transform:none}
 .rail .spacer{flex:1}
 .helpbtn{border:1px solid var(--line);background:var(--card);border-radius:var(--r-s);padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink2);font-weight:700;font-size:11px}
@@ -75,7 +76,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;text-align:left;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
-.pcard .pic{height:88px;border-radius:12px;background:linear-gradient(150deg,#fbeecf,#f7e3e0);display:grid;place-items:center;color:#d9b98a}
+.pcard .pic{height:88px;border-radius:12px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
 .pcard .pic svg{width:34px;height:34px;opacity:.7}
 .pcard .nm{font-weight:800;font-size:14px;line-height:1.28}
 .pcard .age{font-size:12.5px;color:var(--mut);font-weight:600}
@@ -113,7 +114,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .empty .big svg{width:34px;height:34px}
 .empty p{font-weight:700;color:var(--ink2);margin:0 0 4px}
 .empty span{font-size:13px}
-.cart .foot{border-top:1px solid var(--line2);padding:16px 20px 18px;background:linear-gradient(#fff,#fffdf9)}
+.cart .foot{border-top:1px solid var(--line2);padding:16px 20px 18px;background:linear-gradient(#fff,#f9fcfd)}
 .trow{display:flex;justify-content:space-between;font-size:14px;color:var(--ink2);font-weight:600;padding:3px 0}
 .grand{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 4px}
 .grand span{font-weight:700;color:var(--ink2)}
@@ -182,8 +183,8 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 
 /* ---------------- generic cards / tables ---------------- */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:22px}
-.stat{position:relative;background:linear-gradient(180deg,#ffffff,#fffdf8);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;box-shadow:var(--shadow);overflow:hidden;transition:transform .15s,box-shadow .2s}
-.stat::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--sun),#f7c979)}
+.stat{position:relative;background:linear-gradient(180deg,#ffffff,#f8fbfc);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;box-shadow:var(--shadow);overflow:hidden;transition:transform .15s,box-shadow .2s}
+.stat::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--sun),#46aac6)}
 .stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-l)}
 .stat .l{font-size:11.5px;color:var(--ink2);font-weight:800;text-transform:uppercase;letter-spacing:.055em}
 .stat .v{font-family:"Baloo 2";font-size:29px;font-weight:800;margin-top:7px;letter-spacing:-.01em}
@@ -199,9 +200,9 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 
 .list{padding:6px 0}
 .item-row{display:grid;grid-template-columns:auto 1fr auto;gap:15px;padding:16px 20px;border-bottom:1px solid var(--line2);align-items:center;transition:background .12s}
-.item-row:hover{background:#fffdf8}
+.item-row:hover{background:#f8fbfc}
 .item-row:last-child{border-bottom:0}
-.thumb{width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#fbeecf,#f7e3e0);display:grid;place-items:center;color:#d9b98a}
+.thumb{width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
 .thumb svg{width:24px;height:24px;opacity:.7}
 .ir-nm{font-weight:800;font-size:15px}
 .ir-sub{font-size:13px;color:var(--ink2);margin-top:2px;font-weight:600}
@@ -313,7 +314,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .bigbtn[disabled]{opacity:.45;pointer-events:none}
 
 /* ---------------- login / lock ---------------- */
-.lock{position:fixed;inset:0;z-index:200;background:linear-gradient(165deg,#fbf5ec,#efe4d1);display:none;align-items:center;justify-content:center;padding:20px}
+.lock{position:fixed;inset:0;z-index:200;background:linear-gradient(165deg,#e9f4f6,#d6eaef);display:none;align-items:center;justify-content:center;padding:20px}
 .lock.show{display:flex}
 .lock-card{background:var(--card);border-radius:26px;box-shadow:var(--shadow-l);width:100%;max-width:430px;padding:26px 24px 28px;text-align:center}
 .lock-mk{width:58px;height:58px;border-radius:17px;background:var(--sun);display:grid;place-items:center;margin:0 auto 12px;box-shadow:0 4px 0 var(--sun-d)}
@@ -437,7 +438,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 /* ---------------- products, reports ---------------- */
 .recv-banner{display:flex;align-items:center;gap:12px;background:var(--mpesa-t);border:1px solid #bfe5cd;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-weight:700;color:#0c6b40}
 .recv-banner svg{width:22px;height:22px;flex:none}
-.np-form{border:2px solid var(--sun);border-radius:16px;padding:18px;margin-bottom:16px;background:#fffdf7}
+.np-form{border:2px solid var(--sun);border-radius:16px;padding:18px;margin-bottom:16px;background:#f5fbfc}
 .np-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .np-grid .field{margin:0}
 .np-grid .field input{width:100%}
@@ -464,7 +465,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .txn-amt{font-family:"Baloo 2";font-weight:800;font-size:16px;width:118px;text-align:right;flex:none}
 .txn .chev{width:18px;height:18px;color:var(--mut);transition:transform .15s;flex:none}
 .txn.open .chev{transform:rotate(180deg)}
-.txn-body{padding:4px 16px 16px;border-top:1px solid var(--line2);background:#fffdf9}
+.txn-body{padding:4px 16px 16px;border-top:1px solid var(--line2);background:#f9fcfd}
 .txn-line{display:flex;justify-content:space-between;padding:10px 0;font-weight:700;border-bottom:1px solid var(--line2)}
 .txn-line:last-of-type{border-bottom:0}
 .txn-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
@@ -587,7 +588,7 @@ let stockTab='products', addingProduct=false, justReceived=0, repRange='today', 
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
 const ROLES = [
-  {n:'Owner',c:'#39322e'},{n:'Manager',c:'#2f6be6'},{n:'Cashier',c:'#ec7060'},{n:'Stock clerk',c:'#12995a'},{n:'Rider',c:'#f2a12a'}
+  {n:'Owner',c:'#14424f'},{n:'Manager',c:'#1e7f9b'},{n:'Cashier',c:'#e8503a'},{n:'Stock clerk',c:'#7da531'},{n:'Rider',c:'#f4b841'}
 ];
 const RIGHTS = [
   ['Ring up a sale and take payment',[1,1,1,0,0],0],
@@ -1132,15 +1133,15 @@ function settings(){
     </div>
     <div class="panel" style="margin-bottom:16px">
       <div class="pt"><h3>Your team</h3>${can(9)?'<button class="btn sun sm" style="margin-left:auto" data-staffadd>Add someone</button>':''}</div>
-      ${staffAdd&&can(9)?`<div class="set-row" style="background:#fffdf7"><div style="flex:1;min-width:0"><div class="np-grid" style="gap:10px">
+      ${staffAdd&&can(9)?`<div class="set-row" style="background:#f5fbfc"><div style="flex:1;min-width:0"><div class="np-grid" style="gap:10px">
         <div class="field" style="padding:0"><label>Name</label><input id="ns-name" placeholder="e.g. Mary A."></div>
         <div class="field" style="padding:0"><label>Username (for login)</label><input id="ns-username" placeholder="e.g. mary" autocapitalize="none"></div>
         <div class="field" style="padding:0"><label>Role</label><select id="ns-role" class="sel" style="padding:12px 14px">${ROLES.map(r=>`<option>${r.n}</option>`).join('')}</select></div>
         <div class="field" style="padding:0"><label>Password</label>${pwInput('ns-pass')}</div>
       </div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn green sm" data-staffaddsave>Add to team</button><button class="btn sm" data-staffaddcancel>Cancel</button></div></div></div>`:''}
       ${STAFF_LIST.map(s=>`
-        <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${s.c||'#ec7060'}">${(s.name||'?')[0]}</div><div><div class="t">${s.name}</div><div class="d">${s.role} · ${s.username||''}</div></div></div><div class="val" style="gap:8px;flex-wrap:wrap;justify-content:flex-end">${can(9)?`<button class="btn sm" data-staffpw="${s.id}">Set password</button><button class="btn sm" data-staffdel="${s.id}" style="color:var(--stop)">Remove</button>`:'<span style="color:var(--mut);font-size:12.5px">Owner only</span>'}</div></div>
-        ${staffPwEdit===s.id?`<div class="set-row" style="background:#fffdf7"><div style="flex:1;min-width:0"><div class="field" style="padding:0"><label>New password for ${s.name}</label>${pwInput('spw-new')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn green sm" data-staffpwsave="${s.id}">Save</button><button class="btn sm" data-staffpwcancel>Cancel</button></div></div>`:''}
+        <div class="set-row"><div class="me" style="gap:12px"><div class="av" style="width:40px;height:40px;background:${(ROLES.find(r=>r.n===s.role)||{}).c||s.c||'#1e7f9b'}">${(s.name||'?')[0]}</div><div><div class="t">${s.name}</div><div class="d">${s.role} · ${s.username||''}</div></div></div><div class="val" style="gap:8px;flex-wrap:wrap;justify-content:flex-end">${can(9)?`<button class="btn sm" data-staffpw="${s.id}">Set password</button><button class="btn sm" data-staffdel="${s.id}" style="color:var(--stop)">Remove</button>`:'<span style="color:var(--mut);font-size:12.5px">Owner only</span>'}</div></div>
+        ${staffPwEdit===s.id?`<div class="set-row" style="background:#f5fbfc"><div style="flex:1;min-width:0"><div class="field" style="padding:0"><label>New password for ${s.name}</label>${pwInput('spw-new')}</div></div><div class="val" style="flex-direction:column;gap:8px;align-items:stretch"><button class="btn green sm" data-staffpwsave="${s.id}">Save</button><button class="btn sm" data-staffpwcancel>Cancel</button></div></div>`:''}
         ${staffDel===s.id?`<div class="set-row" style="background:#fbe9e7"><div style="flex:1;min-width:0"><div class="t">Remove ${s.name} from the team?</div><div class="d">This cannot be undone.</div></div><div class="val" style="gap:8px"><button class="btn sm" data-staffdelsave="${s.id}" style="background:var(--stop);border-color:var(--stop);color:#fff">Yes, remove</button><button class="btn sm" data-staffdelcancel>Cancel</button></div></div>`:''}`).join('')}
       <div style="padding:14px 20px;font-size:12.5px;color:var(--mut);font-weight:600">Only the owner sees these controls. Changes take effect straight away.</div>
     </div>
@@ -1249,15 +1250,15 @@ function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px
   const registered=setOn('vat_registered',false);
   const vat=(t.vat!==undefined&&t.vat!==null)?t.vat:0;
   const dateStr=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  const dot='border-top:2px dotted #e4d9c7';
+  const dot='border-top:2px dotted #d7e6ea';
   const bag='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8z"/><path d="M8 7c-3 1-4 4-4 7v5a2 2 0 002 2h12a2 2 0 002-2v-5c0-3-1-6-4-7"/></svg>';
-  const mColor={'M-PESA':'#12995a','Cash':'#e08d10','Card':'#2f6be6','Split payment':'#7159c6'}[t.method]||'#6f645b';
+  const mColor={'M-PESA':'#12995a','Cash':'#b0781a','Card':'#2f6be6','Split payment':'#7159c6'}[t.method]||'#6f645b';
   const scallop=(dir)=>`<div style="height:11px;background:radial-gradient(circle at 8px ${dir==='top'?'11px':'0'}, transparent 7px, #fff 8px);background-size:16px 11px;background-repeat:repeat-x"></div>`;
   return `<div style="width:330px;max-width:100%;margin:0 auto;font-family:Nunito,system-ui,sans-serif;color:#3a322e;filter:drop-shadow(0 12px 26px rgba(58,50,46,.16))">
     ${scallop('top')}
     <div style="background:#fff">
-      <div style="text-align:center;padding:20px 22px 14px;background:linear-gradient(180deg,#fffdf6,#fff)">
-        <div style="width:52px;height:52px;border-radius:15px;background:#f2a12a;box-shadow:0 4px 0 #e08d10;display:inline-grid;place-items:center;margin-bottom:10px">${bag}</div>
+      <div style="text-align:center;padding:20px 22px 14px;background:linear-gradient(180deg,#f9fcfd,#fff)">
+        <div style="width:52px;height:52px;border-radius:15px;background:#1e7f9b;box-shadow:0 4px 0 #155f74;display:inline-grid;place-items:center;margin-bottom:10px">${bag}</div>
         <div style="font-family:'Baloo 2',Nunito,sans-serif;font-weight:800;font-size:20px;letter-spacing:-.01em">${SHOP.name}</div>
         <div style="color:#6f645b;font-weight:600;font-size:12.5px;margin-top:2px">${SHOP.branch}, Nairobi</div>
         <div style="color:#98897d;font-weight:600;font-size:11px;margin-top:5px">Till ${SHOP.till} · KRA PIN ${SHOP.pin}</div>
@@ -1273,7 +1274,7 @@ function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px
         <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Customer</span><span style="color:#3a322e">${t.cust||'Walk-in'}</span></div>
       </div>
       <div style="padding:12px 22px;${dot}">
-        ${t.items.map(it=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><div style="font-weight:700;font-size:13.5px;line-height:1.35"><span style="color:#f2a12a;font-weight:800">${it[1]} ×</span> ${it[0]}</div><div style="font-weight:800;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap">${money(it[1]*it[2])}</div></div>`).join('')}
+        ${t.items.map(it=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><div style="font-weight:700;font-size:13.5px;line-height:1.35"><span style="color:#e8503a;font-weight:800">${it[1]} ×</span> ${it[0]}</div><div style="font-weight:800;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap">${money(it[1]*it[2])}</div></div>`).join('')}
       </div>
       <div style="padding:14px 22px;${dot}">
         <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:800;font-size:14px">Total</span><span style="font-family:'Baloo 2',Nunito,sans-serif;font-weight:800;font-size:23px;font-variant-numeric:tabular-nums">KSh ${money(t.amt)}</span></div>
@@ -1284,7 +1285,7 @@ function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px
         <div style="font-family:ui-monospace,'Courier New',monospace;font-size:23px;letter-spacing:1px;line-height:1;color:#3a322e">▏▍▏▎▍▏▊▏▎▍▏▍▏▎▍</div>
         <div style="font-size:10px;color:#98897d;font-weight:600;letter-spacing:.1em;margin-top:4px">${t.ref||''} · ${SHOP.till}</div>
         <div style="margin-top:12px;font-size:11.5px;color:#6f645b;font-weight:600;line-height:1.7">${!registered?'Not VAT registered<br>':''}${setOn('etims_receipts',true)?'A valid eTIMS tax receipt<br>':''}Swaps within 14 days with this receipt</div>
-        <div style="margin-top:10px;font-family:'Baloo 2',Nunito,sans-serif;font-weight:700;font-size:15px;color:#f2a12a">Asante sana, karibu tena</div>
+        <div style="margin-top:10px;font-family:'Baloo 2',Nunito,sans-serif;font-weight:700;font-size:15px;color:#1e7f9b">Asante sana, karibu tena</div>
       </div>
     </div>
     ${scallop('bottom')}
@@ -1351,7 +1352,7 @@ function render(){
   lockEl.classList.remove('show');
   if(view!=='checkout' && !allowedNav().some(n=>n.key===view)){ const f=allowedNav()[0]; view=f?f.key:'sell'; }
   document.getElementById('navlist').innerHTML = buildNav();
-  document.getElementById('meBox').innerHTML = `<div class="av" style="background:${currentUser.c}">${initials(currentUser.name)}</div><div><div class="nm">${currentUser.name}</div><div class="rl">${currentUser.role}</div></div>`;
+  document.getElementById('meBox').innerHTML = `<div class="av" style="background:${(ROLES.find(r=>r.n===currentUser.role)||{}).c||currentUser.c}">${initials(currentUser.name)}</div><div><div class="nm">${currentUser.name}</div><div class="rl">${currentUser.role}</div></div>`;
   document.getElementById('shiftBox').innerHTML = `<span class="dot"></span>${currentUser.name.split(' ')[0]} on the till`;
   screen.innerHTML = VIEWS[view]();
   const t=TITLES[view]||['',''];
