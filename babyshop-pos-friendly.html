@@ -358,6 +358,9 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .login-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--sun-d)}
 .login-btn svg{width:20px;height:20px}
 .login-err{background:var(--stop-t);color:var(--stop);font-weight:700;font-size:13.5px;border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center}
+.login-note{background:var(--sun-t);color:var(--sun-d);font-weight:700;font-size:13px;border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center;line-height:1.5}
+.login-forgot{display:block;width:100%;margin-top:14px;border:0;background:none;color:var(--ink2);font-weight:800;font-size:13.5px;text-decoration:underline;cursor:pointer}
+.login-forgot:hover{color:var(--ink)}
 .pw-wrap{position:relative;display:block}
 .pw-wrap input{width:100%;padding-right:70px}
 .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--ink2);font-weight:800;font-size:12px;cursor:pointer;padding:7px 9px;border-radius:9px}
@@ -653,6 +656,7 @@ const RIGHTS = [
 // Staff and their credentials live on the server; sign in checks /api/login.
 const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 let currentUser=null, loginUserVal='', loginError='';
+let forgotOpen=false, forgotMsg='', resetToken=null, resetMsg='', loginNote='';
 function roleIdx(){ return currentUser ? ROLES.findIndex(r=>r.n===currentUser.role) : -1; }
 function can(i){ const ri=roleIdx(); return ri>=0 && !!RIGHTS[i][1][ri]; }
 // right indexes: 0 sell,1 discount>10,2 cancel,3 accept delivery,4 set price,5 approve return,6 refund,7 see cost,8 close day,9 staff
@@ -686,6 +690,35 @@ function buildNav(){
 function lockScreen(){
   const mk='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8z"/><path d="M8 7c-3 1-4 4-4 7v5a2 2 0 002 2h12a2 2 0 002-2v-5c0-3-1-6-4-7"/></svg>';
   const arrow='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  // Reset mode: opened from the emailed link (?reset=token)
+  if(resetToken){
+    return `<div class="lock-card">
+      <div class="lock-mk">${mk}</div>
+      <h2>Set a new password</h2>
+      <div class="sub">Choose a new owner password</div>
+      <form class="login-form" id="resetForm">
+        <div class="login-field"><label>New password (at least 4 characters)</label>${pwInput('rp-new')}</div>
+        <div class="login-field"><label>Repeat new password</label>${pwInput('rp-confirm')}</div>
+        ${resetMsg?`<div class="login-err">${resetMsg}</div>`:''}
+        <button type="submit" class="login-btn">Save new password ${arrow}</button>
+      </form>
+    </div>`;
+  }
+  // Forgot mode: request an email reset link
+  if(forgotOpen){
+    return `<div class="lock-card">
+      <div class="lock-mk">${mk}</div>
+      <h2>Forgot password</h2>
+      <div class="sub">We will email the owner a reset link</div>
+      <form class="login-form" id="forgotForm">
+        <div class="login-field"><label for="fgUser">Owner username</label><input id="fgUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. wsheks" value="${(loginUserVal||'').replace(/"/g,'&quot;')}"></div>
+        ${forgotMsg?`<div class="login-note">${forgotMsg}</div>`:''}
+        <button type="submit" class="login-btn">Send reset link ${arrow}</button>
+      </form>
+      <button class="login-forgot" data-forgotback>Back to sign in</button>
+    </div>`;
+  }
+  // Sign-in (default)
   return `<div class="lock-card">
     <div class="lock-mk">${mk}</div>
     <h2>Babyshop POS</h2>
@@ -694,8 +727,10 @@ function lockScreen(){
       <div class="login-field"><label for="loginUser">Username</label><input id="loginUser" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. wsheks" value="${loginUserVal.replace(/"/g,'&quot;')}"></div>
       <div class="login-field"><label for="loginPass">Password</label><div class="pw-wrap"><input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Your password"><button type="button" class="pw-eye" data-eye="loginPass">Show</button></div></div>
       ${loginError?`<div class="login-err">${loginError}</div>`:''}
+      ${loginNote?`<div class="login-note">${loginNote}</div>`:''}
       <button type="submit" class="login-btn">Sign in ${arrow}</button>
     </form>
+    <button class="login-forgot" data-forgot>Forgot password?</button>
     <div class="hint">Demo sign in: wsheks / babyshop</div>
   </div>`;
 }
@@ -720,6 +755,26 @@ async function doLogin(){
     const l=document.getElementById('lock'); l.classList.add('shake'); setTimeout(()=>l.classList.remove('shake'),320);
     refreshLock();
   }
+}
+async function doForgot(){
+  const u=document.getElementById('fgUser'); const username=(u&&u.value||'').trim();
+  loginUserVal=username;
+  if(!username){ forgotMsg='Enter the owner username'; refreshLock(); return; }
+  try{ await api('/api/forgot','POST',{username}); }catch(e){}
+  forgotMsg='If that is the owner account, a reset link has been emailed to the shop email address. Open it within 30 minutes.';
+  refreshLock();
+}
+async function doReset(){
+  const n=(document.getElementById('rp-new')||{}).value||'', c=(document.getElementById('rp-confirm')||{}).value||'';
+  if(n.length<4){ resetMsg='Password must be at least 4 characters'; refreshLock(); return; }
+  if(n!==c){ resetMsg='The two passwords do not match'; refreshLock(); return; }
+  try{
+    await api('/api/reset','POST',{token:resetToken,newPassword:n});
+    resetToken=null; resetMsg=''; loginNote='Password changed. Please sign in.';
+    currentUser=null; AUTH_TOKEN=''; try{ localStorage.removeItem('babypos_user'); localStorage.removeItem('babypos_token'); }catch(e){}
+    try{ history.replaceState({},'',location.pathname); }catch(e){}
+    refreshLock();
+  }catch(err){ resetMsg=err.message||'This reset link has expired. Request a new one.'; refreshLock(); }
 }
 
 /* -------- online orders view -------- */
@@ -1398,7 +1453,7 @@ const screen = document.getElementById('screen');
 
 const lockEl=document.getElementById('lock');
 function render(){
-  if(!currentUser){ lockEl.classList.add('show'); lockEl.innerHTML=lockScreen(); const u=document.getElementById('loginUser'); if(u) u.focus(); return; }
+  if(!currentUser || resetToken){ lockEl.classList.add('show'); lockEl.innerHTML=lockScreen(); const u=document.getElementById('loginUser'); if(u) u.focus(); return; }
   lockEl.classList.remove('show');
   if(view!=='checkout' && !allowedNav().some(n=>n.key===view)){ const f=allowedNav()[0]; view=f?f.key:'sell'; }
   document.getElementById('navlist').innerHTML = buildNav();
@@ -1560,7 +1615,15 @@ screen.addEventListener('keydown',e=>{
   if(e.target.id==='discIn' && e.key==='Enter'){ e.preventDefault(); applyDiscount(parseInt((e.target.value||'').replace(/\D/g,''))||0); render(); }
 });
 // login: username and password, checked on the server
-lockEl.addEventListener('submit',e=>{ if(e.target.id==='loginForm'){ e.preventDefault(); doLogin(); } });
+lockEl.addEventListener('submit',e=>{
+  if(e.target.id==='loginForm'){ e.preventDefault(); doLogin(); }
+  else if(e.target.id==='forgotForm'){ e.preventDefault(); doForgot(); }
+  else if(e.target.id==='resetForm'){ e.preventDefault(); doReset(); }
+});
+lockEl.addEventListener('click',e=>{
+  if(e.target.closest('[data-forgot]')){ forgotOpen=true; loginError=''; loginNote=''; forgotMsg=''; refreshLock(); }
+  else if(e.target.closest('[data-forgotback]')){ forgotOpen=false; forgotMsg=''; refreshLock(); }
+});
 // Show/hide password eye buttons (login and settings)
 document.addEventListener('click',e=>{ const eye=e.target.closest('[data-eye]'); if(!eye) return; const inp=document.getElementById(eye.dataset.eye); if(!inp) return; if(inp.type==='password'){ inp.type='text'; eye.textContent='Hide'; } else { inp.type='password'; eye.textContent='Show'; } });
 document.getElementById('signOut').addEventListener('click',()=>{ try{ api('/api/logout','POST'); }catch(e){} currentUser=null; loginUserVal=''; loginError=''; try{ localStorage.removeItem('babypos_user'); localStorage.removeItem('babypos_token'); }catch(e){} AUTH_TOKEN=''; view='sell'; resetPay(); showParked=false; render(); });
@@ -1610,6 +1673,8 @@ bg.addEventListener('click',closeHelp);
 
 // Load the shop's data from the backend, then show the till.
 async function boot(){
+  // A reset link (?reset=token) opens the "set a new password" screen.
+  try{ const rt=new URL(location.href).searchParams.get('reset'); if(rt) resetToken=rt; }catch(e){}
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }

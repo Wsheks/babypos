@@ -9,7 +9,41 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const tls = require('node:tls');
 const { db, now, transaction } = require('./db');
+
+// Mail config lives in mail.json next to server.js (gitignored): {"user","pass","to"}.
+// Absent = email features are simply off (endpoints still respond, just don't send).
+function mailConfig() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'mail.json'), 'utf8')); }
+  catch (e) { return null; }
+}
+// Minimal Gmail SMTP sender over TLS (465). No external packages.
+function sendMail({ user, pass, from, to, subject, text }) {
+  return new Promise((resolve, reject) => {
+    const cmds = [null,
+      'EHLO ilekela\r\n', 'AUTH LOGIN\r\n',
+      Buffer.from(user).toString('base64') + '\r\n',
+      Buffer.from(pass).toString('base64') + '\r\n',
+      `MAIL FROM:<${from}>\r\n`, `RCPT TO:<${to}>\r\n`, 'DATA\r\n',
+      `From: ilekela POS <${from}>\r\nTo: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n.\r\n`,
+      'QUIT\r\n'];
+    const sock = tls.connect(465, 'smtp.gmail.com', { servername: 'smtp.gmail.com' });
+    let step = 0, buf = '';
+    sock.setEncoding('utf8');
+    sock.setTimeout(15000, () => { sock.destroy(); reject(new Error('SMTP timeout')); });
+    sock.on('error', reject);
+    sock.on('data', d => {
+      buf += d; let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).replace(/\r$/, ''); buf = buf.slice(i + 1);
+        const m = line.match(/^(\d{3})([ -])/); if (!m) continue;
+        if (Number(m[1]) >= 400) { sock.destroy(); return reject(new Error('SMTP: ' + line)); }
+        if (m[2] === ' ') { step++; if (step < cmds.length) { if (cmds[step] != null) sock.write(cmds[step]); } else { sock.end(); resolve(true); } }
+      }
+    });
+  });
+}
 
 const PORT = process.env.PORT || 4100;
 // Find the front-end file whether it sits next to server.js (flat deploy) or one level up (dev layout).
@@ -397,6 +431,41 @@ const server = http.createServer(async (req, res) => {
       const token = req.headers['x-auth-token'];
       if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(String(token));
       return sendJSON(res, 200, { ok: true });
+    }
+
+    // Owner "forgot password": email a reset link. Always responds generically (no user enumeration).
+    if (p === '/api/forgot' && method === 'POST') {
+      const body = await readBody(req);
+      const uname = String(body.username || '').trim().toLowerCase();
+      const owner = db.prepare("SELECT * FROM staff WHERE lower(username) = ? AND role = 'Owner'").get(uname);
+      const cfg = mailConfig();
+      if (owner && cfg && cfg.user && cfg.pass && cfg.to) {
+        const token = crypto.randomBytes(24).toString('hex');
+        const expires = new Date(Date.now() + 30 * 60000).toISOString();
+        db.prepare('DELETE FROM resets WHERE username = ?').run(owner.username);
+        db.prepare('INSERT INTO resets (token, username, expires_at) VALUES (?, ?, ?)').run(token, owner.username, expires);
+        const link = `https://${req.headers.host}/?reset=${token}`;
+        try {
+          await sendMail({ user: cfg.user, pass: cfg.pass, from: cfg.user, to: cfg.to,
+            subject: 'Reset your ilekela POS password',
+            text: `A password reset was requested for the owner login "${owner.username}".\n\nOpen this link within 30 minutes to set a new password:\n${link}\n\nIf you did not request this, ignore this email and your password stays the same.` });
+        } catch (err) { console.error('reset email failed:', err.message); }
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    // Complete a reset with the emailed token.
+    if (p === '/api/reset' && method === 'POST') {
+      const body = await readBody(req);
+      const token = String(body.token || '');
+      const next = String(body.newPassword || '');
+      if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
+      const row = db.prepare('SELECT * FROM resets WHERE token = ?').get(token);
+      if (!row || new Date(row.expires_at) < new Date()) return sendJSON(res, 400, { error: 'This reset link has expired or is invalid. Request a new one.' });
+      db.prepare('UPDATE staff SET password = ? WHERE lower(username) = ?').run(next, row.username.toLowerCase());
+      db.prepare('DELETE FROM resets WHERE username = ?').run(row.username);
+      db.prepare('DELETE FROM sessions WHERE username = ?').run(row.username);  // log out old sessions
+      return sendJSON(res, 200, { ok: true, username: row.username });
     }
 
     if (p === '/api/sales' && method === 'POST') {

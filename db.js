@@ -172,6 +172,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   role       TEXT,
   created_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS resets (
+  token      TEXT PRIMARY KEY,
+  username   TEXT,
+  expires_at TEXT
+);
 `);
 
 // ---------------------------------------------------------------
