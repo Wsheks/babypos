@@ -524,6 +524,17 @@ html,body{max-width:100%;overflow-x:hidden}
  .topbar,.screen{padding-left:12px;padding-right:12px}
  .products{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
 }
+/* "Who can do what" table -> stacked cards on phones (no sideways scroll) */
+@media (max-width:640px){
+ .rights-tbl thead{display:none}
+ .rights-tbl,.rights-tbl tbody,.rights-tbl td{display:block;width:100%}
+ .rights-tbl tr{display:block;width:auto;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;margin:0 12px 10px;padding:4px 14px 8px;background:#fff}
+ .rights-tbl td{padding:11px 0;border:0;border-bottom:1px solid var(--line2);text-align:left}
+ .rights-tbl td:last-child{border-bottom:0}
+ .rights-tbl td.rt-name{font-weight:800;font-size:14px;color:var(--ink);border-bottom:2px solid var(--line);padding:12px 0 9px}
+ .rights-tbl td[data-role]{display:flex;align-items:center;justify-content:space-between}
+ .rights-tbl td[data-role]::before{content:attr(data-role);font-weight:700;color:var(--ink2);font-size:13.5px}
+}
 </style>
 </head>
 <body>
@@ -1121,8 +1132,8 @@ function settings(){
         ${ROLES.map(r=>`<th><div class="rl-head"><div class="av" style="background:${r.c}">${r.n[0]}</div>${r.n}</div></th>`).join('')}
       </tr></thead><tbody>
         ${RIGHTS.map((row,i)=>`<tr>
-          <td>${row[0]}${row[2]?'<span class="money-note"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 10V7a6 6 0 0112 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/></svg>PIN</span>':''}</td>
-          ${row[1].map((v,j)=>`<td><button class="switch ${v?'on':''}" data-sw="r${i}${j}" aria-label="toggle"></button></td>`).join('')}
+          <td class="rt-name">${row[0]}${row[2]?'<span class="money-note"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 10V7a6 6 0 0112 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/></svg>PIN</span>':''}</td>
+          ${row[1].map((v,j)=>`<td data-role="${ROLES[j].n}"><button class="switch ${v?'on':''}" data-sw="r${i}${j}" aria-label="${ROLES[j].n}"></button></td>`).join('')}
         </tr>`).join('')}
       </tbody></table></div>
       <div style="padding:16px 20px;border-top:1px solid var(--line2);font-size:13px;color:var(--ink2);font-weight:600">Jobs marked <b>PIN</b> touch money, so they always ask for a manager PIN, even when they are switched on. Every change here is saved with your name and the time.</div>
