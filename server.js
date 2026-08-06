@@ -9,39 +9,42 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const tls = require('node:tls');
+const https = require('node:https');
 const { db, now, transaction } = require('./db');
 
-// Mail config lives in mail.json next to server.js (gitignored): {"user","pass","to"}.
+// Mail config lives in mail.json next to server.js (gitignored):
+//   {"key":"re_...","from":"ilekela POS <onboarding@resend.dev>","to":"owner@gmail.com"}
+// Sent via Resend's HTTPS API (port 443) because cloud hosts block outbound SMTP.
 // Absent = email features are simply off (endpoints still respond, just don't send).
 function mailConfig() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'mail.json'), 'utf8')); }
   catch (e) { return null; }
 }
-// Minimal Gmail SMTP sender over TLS (465). No external packages.
-function sendMail({ user, pass, from, to, subject, text }) {
+// Send an email through the Resend HTTPS API. No external packages.
+function sendMail({ key, from, to, subject, text }) {
   return new Promise((resolve, reject) => {
-    const cmds = [null,
-      'EHLO ilekela\r\n', 'AUTH LOGIN\r\n',
-      Buffer.from(user).toString('base64') + '\r\n',
-      Buffer.from(pass).toString('base64') + '\r\n',
-      `MAIL FROM:<${from}>\r\n`, `RCPT TO:<${to}>\r\n`, 'DATA\r\n',
-      `From: ilekela POS <${from}>\r\nTo: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n.\r\n`,
-      'QUIT\r\n'];
-    const sock = tls.connect(465, 'smtp.gmail.com', { servername: 'smtp.gmail.com' });
-    let step = 0, buf = '';
-    sock.setEncoding('utf8');
-    sock.setTimeout(15000, () => { sock.destroy(); reject(new Error('SMTP timeout')); });
-    sock.on('error', reject);
-    sock.on('data', d => {
-      buf += d; let i;
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i).replace(/\r$/, ''); buf = buf.slice(i + 1);
-        const m = line.match(/^(\d{3})([ -])/); if (!m) continue;
-        if (Number(m[1]) >= 400) { sock.destroy(); return reject(new Error('SMTP: ' + line)); }
-        if (m[2] === ' ') { step++; if (step < cmds.length) { if (cmds[step] != null) sock.write(cmds[step]); } else { sock.end(); resolve(true); } }
-      }
+    const payload = JSON.stringify({
+      from: from || 'ilekela POS <onboarding@resend.dev>',
+      to: [to], subject, text,
     });
+    const req = https.request({
+      hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, r => {
+      let buf = ''; r.setEncoding('utf8');
+      r.on('data', d => buf += d);
+      r.on('end', () => {
+        if (r.statusCode >= 200 && r.statusCode < 300) resolve(true);
+        else reject(new Error('Resend ' + r.statusCode + ': ' + buf));
+      });
+    });
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('email timeout')); });
+    req.on('error', reject);
+    req.write(payload); req.end();
   });
 }
 
@@ -439,17 +442,17 @@ const server = http.createServer(async (req, res) => {
       const uname = String(body.username || '').trim().toLowerCase();
       const owner = db.prepare("SELECT * FROM staff WHERE lower(username) = ? AND role = 'Owner'").get(uname);
       const cfg = mailConfig();
-      if (owner && cfg && cfg.user && cfg.pass && cfg.to) {
+      if (owner && cfg && cfg.key && cfg.to) {
         const token = crypto.randomBytes(24).toString('hex');
         const expires = new Date(Date.now() + 30 * 60000).toISOString();
         db.prepare('DELETE FROM resets WHERE username = ?').run(owner.username);
         db.prepare('INSERT INTO resets (token, username, expires_at) VALUES (?, ?, ?)').run(token, owner.username, expires);
         const link = `https://${req.headers.host}/?reset=${token}`;
         try {
-          await sendMail({ user: cfg.user, pass: cfg.pass, from: cfg.user, to: cfg.to,
+          await sendMail({ key: cfg.key, from: cfg.from, to: cfg.to,
             subject: 'Reset your ilekela POS password',
             text: `A password reset was requested for the owner login "${owner.username}".\n\nOpen this link within 30 minutes to set a new password:\n${link}\n\nIf you did not request this, ignore this email and your password stays the same.` });
-        } catch (err) { console.error('reset email failed:', err.message); }
+        } catch (err) { console.error('reset email failed:', (err && (err.message || err.code)) || err); }
       }
       return sendJSON(res, 200, { ok: true });
     }
