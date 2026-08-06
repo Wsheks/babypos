@@ -73,7 +73,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .chip:hover{border-color:var(--sun)}
 .chip:active{transform:translateY(1px)}
 .chip.on{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 4px 12px rgba(58,50,46,.2)}
-.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
+.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(140px,44vw,168px),1fr));gap:14px}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;text-align:left;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
 .pcard .pic{height:88px;border-radius:12px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
@@ -476,6 +476,12 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .txn-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 @media (max-width:600px){.np-grid{grid-template-columns:1fr}.txn-amt{width:92px}.txn-time{display:none}}
 
+/* never let anything push the page sideways */
+html,body{max-width:100%;overflow-x:hidden}
+.app,.main{min-width:0}
+/* mobile Products <-> Cart tab switch on the Sell screen (shown only on phones) */
+.selltabs{display:none}
+
 @media (max-width:1080px){
  .sell,.co{grid-template-columns:1fr}
  .cart{position:static;max-height:none}
@@ -485,14 +491,38 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 }
 @media (max-width:720px){
  .app{grid-template-columns:1fr}
- .rail{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border-right:0;border-top:1px solid var(--line);z-index:40;padding:8px;justify-content:space-around}
+ .rail{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border-right:0;border-top:1px solid var(--line);z-index:40;padding:6px 4px;justify-content:space-around}
  .rail .logo,.rail .spacer,.rail .helpbtn{display:none}
- .navbtn{flex:1;padding:8px 2px}
+ #navlist{flex:1;flex-direction:row;gap:2px;width:100%}   /* bottom bar runs horizontally */
+ .navbtn{flex:1;min-width:0;padding:8px 2px;border-radius:12px}
  .navbtn svg{width:23px;height:23px}
- .main{padding-bottom:80px}
- .topbar,.screen{padding-left:18px;padding-right:18px}
+ .navbtn .nbadge{right:calc(50% - 20px)}
+ .main{padding-bottom:76px}
+ .topbar,.screen{padding-left:16px;padding-right:16px}
  .methods{grid-template-columns:1fr}
  .rights-tbl{font-size:12px}
+ /* Sell: show one column at a time via the tabs */
+ .selltabs{display:flex;gap:8px;margin-bottom:14px}
+ .selltabs button{flex:1;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:12px 8px;font-weight:800;font-size:14px;color:var(--ink2);box-shadow:var(--shadow)}
+ .selltabs button.on{background:var(--sun);border-color:var(--sun);color:#fff}
+ .sell.m-products .cart{display:none}
+ .sell.m-cart .sellmain{display:none}
+ /* bigger touch targets */
+ .stepper button{width:44px;height:44px}
+ .stepper .q{min-width:40px;font-size:15px}
+ .btn.sm,.chip{min-height:40px}
+ .quick button,.disc button{min-height:48px}
+}
+@media (max-width:520px){
+ /* stack list rows so price + tags + buttons never overflow */
+ .item-row{grid-template-columns:auto 1fr;gap:12px 12px}
+ .item-row .ir-right{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:8px}
+ .ir-right>div[style*="text-align:right"]{text-align:left!important}
+ .grand b{font-size:clamp(28px,8vw,34px)}
+}
+@media (max-width:400px){
+ .topbar,.screen{padding-left:12px;padding-right:12px}
+ .products{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
 }
 </style>
 </head>
@@ -621,6 +651,7 @@ let HELD = [];       // parked sales, loaded in boot()
 let ORDERS = [];     // online orders, loaded in boot()
 let orderFilter=null; // Orders screen: which status card is selected (null = show all)
 let saleDiscount=0, discPending=0, showParked=false;
+let mobileTab='products';   // Sell screen on phones: 'products' or 'cart'
 const dueT = () => Math.max(0, subT()-saleDiscount);   // saleDiscount is a KSh amount off
 
 /* -------- navigation (built from rights) -------- */
@@ -732,8 +763,12 @@ function parkedPanel(){
 /* -------- SELL -------- */
 function sell(){
   const empty = CART.length===0;
-  return `<div class="sell">
-    <div>
+  return `<div class="selltabs">
+      <button class="${mobileTab==='products'?'on':''}" data-mtab="products">Products</button>
+      <button class="${mobileTab==='cart'?'on':''}" data-mtab="cart">This sale${itemsT()?` (${itemsT()})`:''}</button>
+    </div>
+    <div class="sell m-${mobileTab}">
+    <div class="sellmain">
       <div class="searchwrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
         <input class="search" placeholder="Search a name, age or scan a tag">
@@ -1370,6 +1405,8 @@ document.querySelector('.rail').addEventListener('click',e=>{
 });
 screen.addEventListener('click',async e=>{
   // open the payment step from the sale
+  // mobile Sell tab switch (Products <-> This sale)
+  const mtab=e.target.closest('[data-mtab]'); if(mtab){ mobileTab=mtab.dataset.mtab; render(); return; }
   const goto=e.target.closest('[data-goto]'); if(goto){ if(goto.dataset.goto==='checkout'){ if(CART.length===0) return; resetPay(); } view=goto.dataset.goto; render(); return; }
 
   // payment step actions
