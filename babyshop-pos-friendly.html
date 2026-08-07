@@ -677,6 +677,9 @@ let orderFilter=null; // Orders screen: which status card is selected (null = sh
 let saleDiscount=0, discPending=0, showParked=false;
 let mobileTab='products';   // Sell screen on phones: 'products' or 'cart'
 const dueT = () => Math.max(0, subT()-saleDiscount);   // saleDiscount is a KSh amount off
+// Quick cash suggestions worked out from the amount due: exact, then the next
+// round 500, 1000 and 5000 above it (never hardcoded).
+const quickTenders = t => { const up=s=>(Math.floor(t/s)+1)*s; return [t, up(500), up(1000), up(5000)]; };
 
 /* -------- navigation (built from rights) -------- */
 const NAV = [
@@ -831,7 +834,7 @@ function parkedPanel(){
   if(!showParked) return '';
   if(HELD.length===0) return `<div class="parked"><div class="ph"><h4>Parked sales</h4><button class="chg" data-parked="close">Close</button></div><div style="color:var(--mut);font-weight:600;padding:6px 0 8px">Nothing parked right now. Use Hold or Reserve to park a sale.</div></div>`;
   return `<div class="parked"><div class="ph"><h4>Parked sales (${HELD.length})</h4><button class="chg" data-parked="close">Close</button></div>
-    ${HELD.map((h,i)=>`<div class="held"><div><div class="hn">${h.cust||'Walk-in'} ${h.type==='reserve'?'<span class="pill info" style="margin-left:6px">Reserved</span>':''}</div><div class="hd">${h.lines.reduce((t,l)=>t+l.q,0)} items · KSh ${money(h.lines.reduce((t,l)=>t+l.p*l.q,0))}${h.deposit?` · deposit ${money(h.deposit)} paid`:''} · ${h.at}</div></div><div class="hb"><button class="btn green sm" data-resume="${i}">Resume</button><button class="btn sm" data-drop="${i}">Remove</button></div></div>`).join('')}
+    ${HELD.map((h,i)=>`<div class="held"><div><div class="hn">${h.cust||'Walk-in'} ${h.type==='reserve'?'<span class="pill info" style="margin-left:6px">Reserved</span>':''}${h.type==='await'?'<span class="pill await" style="margin-left:6px">Awaiting M-PESA</span>':''}</div><div class="hd">${h.lines.reduce((t,l)=>t+l.q,0)} items · KSh ${money(h.lines.reduce((t,l)=>t+l.p*l.q,0))}${h.deposit?` · deposit ${money(h.deposit)} paid`:''} · ${h.at}</div></div><div class="hb"><button class="btn green sm" data-resume="${i}">Resume</button><button class="btn sm" data-drop="${i}">Remove</button></div></div>`).join('')}
   </div>`;
 }
 
@@ -902,8 +905,18 @@ function sell(){
 }
 
 /* -------- CHECKOUT (a step inside the sale, not a menu item) -------- */
-let payMethod='mpesa', payStage='choose', cashGiven=0, splitParts=[], paidAmount=0;
-function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;}
+let payMethod='mpesa', payStage='choose', cashGiven=0, splitParts=[], paidAmount=0, paidChange=0, paidTendered=0;
+let stkTimer=null;
+// Live countdown on the M-PESA waiting screen. Restarts each time a request is sent.
+function startStkCountdown(seconds){
+  clearInterval(stkTimer);
+  let left=seconds;
+  const tick=()=>{ const el=document.getElementById('stkcount'); if(!el){ clearInterval(stkTimer); return; }
+    if(left<=0){ el.textContent='expired'; clearInterval(stkTimer); return; }
+    const m=Math.floor(left/60), s=left%60; el.textContent=m+':'+String(s).padStart(2,'0'); left--; };
+  tick(); stkTimer=setInterval(tick,1000);
+}
+function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;paidChange=0;paidTendered=0;clearInterval(stkTimer);}
 // Apply a manual KSh discount. Over 10% of the sale needs a manager (held in discPending until approved).
 function applyDiscount(amt){
   amt=Math.max(0, Math.min(Math.round(amt)||0, subT()));
@@ -923,12 +936,14 @@ function payPanel(){
           <div class="stk-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7H14a3.5 3.5 0 010 7H6"/></svg></div>
           <div class="tt">Pay ilekela<br>KSh ${money(total)}</div></div></div>
         <div class="wait-t">Waiting for her PIN</div>
-        <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>She just taps her M-PESA PIN. Expires in 1:42.</div>
+        <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>She just taps her M-PESA PIN. Expires in <b id="stkcount">2:00</b>.</div>
         <div style="display:grid;gap:9px;margin-top:18px">
           <button class="bigbtn" data-pay="paid">${stkIcon} She has paid</button>
           <button class="bigbtn ghost" data-pay="send">Send the request again</button>
           <button class="bigbtn ghost" data-pay="match">She paid the till, match her code</button>
-        </div></div>`;
+          <button class="bigbtn ghost" data-pay="park">Park this sale, serve the next customer</button>
+        </div>
+        <div class="tip" style="margin-top:14px;text-align:left"><div class="ic">${infoIcon}</div><p>No need to wait at the till. Park it and it moves to your parked sales; open it again when her payment comes through.</p></div></div>`;
     }
     return `<div class="fld"><label>Her M-PESA number</label><input value="0722 418 903"></div>
       <button class="bigbtn" data-pay="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg> Send request to her phone</button>
@@ -949,9 +964,7 @@ function payPanel(){
     const change=Math.max(0,cashGiven-total), enough=cashGiven>=total;
     return `<div class="fld"><label>Cash she gave you</label><input id="cashin" value="${cashGiven||''}" placeholder="0" inputmode="numeric"></div>
       <div class="quick">
-        <button data-cash="${total}">Exact, ${money(total)}</button>
-        <button data-cash="5000">5,000</button>
-        <button data-cash="10000">10,000</button>
+        ${quickTenders(total).map((amt,i)=>`<button data-cash="${amt}">${i===0?`Exact, ${money(amt)}`:money(amt)}</button>`).join('')}
       </div>
       <div class="changebox" style="background:${enough?'var(--mpesa-t)':'#f6efe3'}"><span>Change to give her</span><b class="num baloo" style="font-size:20px;color:${enough?'var(--mpesa)':'var(--mut)'}">KSh ${money(change)}</b></div>
       <button class="bigbtn sun" style="margin-top:16px" data-pay="paid" ${enough?'':'disabled'}>${stkIcon} Done, print the receipt</button>`;
@@ -972,8 +985,12 @@ function checkout(){
     return `<div class="paid-wrap">
       <div class="paid-circle">${stkIcon}</div>
       <h2 class="baloo" style="font-size:27px">Paid, thank you</h2>
-      <div class="paid-amt num">KSh ${money(paidAmount)}</div>
-      <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}</div>
+      ${payMethod==='cash'
+        ? `<div style="color:var(--mut);font-weight:700;margin-bottom:2px">Change to give her</div>
+           <div class="paid-amt num">KSh ${money(paidChange)}</div>
+           <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
+        : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
+           <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}</div>`}
       <div class="paid-card">
         <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v17H6z"/><path d="M9 8h6M9 12h6"/></svg><span>Receipt printed</span><span class="pill ok" style="margin-left:auto">Done</span></div>
         <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg><span>Sent to her on WhatsApp</span><span class="pill ok" style="margin-left:auto">Done</span></div>
@@ -1511,10 +1528,16 @@ screen.addEventListener('click',async e=>{
   const pay=e.target.closest('[data-pay]');
   if(pay){ const a=pay.dataset.pay;
     if(a==='back'){ view='sell'; render(); }
-    else if(a==='send'||a==='match'){ payStage='waiting'; render(); }
+    else if(a==='send'||a==='match'){ payStage='waiting'; render(); startStkCountdown(120); }
+    else if(a==='park'){
+      if(CART.length){ try{ const r=await api('/api/held','POST',{type:'await',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Awaiting M-PESA'}); HELD.unshift(r.held); }catch(err){ toast('Could not park the sale',true); } }
+      CART=[]; resetPay(); view='sell'; toast('Parked. Serving the next customer.'); render();
+    }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
     else if(a==='paid'){
       paidAmount=dueT();
+      paidTendered = payMethod==='cash' ? cashGiven : dueT();
+      paidChange = payMethod==='cash' ? Math.max(0, cashGiven-dueT()) : 0;
       try{
         const r=await api('/api/sales','POST',{
           lines:CART.map(l=>({id:l.id,n:l.n,a:l.a,q:l.q,p:l.p})),
@@ -1579,7 +1602,9 @@ screen.addEventListener('click',async e=>{
   const pk=e.target.closest('[data-parked]'); if(pk){ showParked=(pk.dataset.parked==='open'); render(); return; }
   const hold=e.target.closest('[data-hold]'); if(hold){ if(CART.length){ try{ const r=await api('/api/held','POST',{type:'hold',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Held just now'}); HELD.unshift(r.held); CART=[]; }catch(err){ toast('Could not park the sale',true); } } render(); return; }
   const res=e.target.closest('[data-reserve]'); if(res){ if(CART.length){ const dep=Math.round(subT()*0.3/100)*100; try{ const r=await api('/api/held','POST',{type:'reserve',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:dep,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Reserved just now'}); HELD.unshift(r.held); CART=[]; }catch(err){ toast('Could not reserve the sale',true); } } render(); return; }
-  const rsm=e.target.closest('[data-resume]'); if(rsm){ const item=HELD[+rsm.dataset.resume]; if(CART.length){ try{ const r=await api('/api/held','POST',{type:'hold',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Held just now'}); HELD.push(r.held); }catch(err){} } CART=item.lines.map(l=>({...l})); if(item.id!=null){ try{ await api('/api/held/'+item.id,'DELETE'); }catch(err){} } HELD=HELD.filter(h=>h!==item); showParked=false; render(); return; }
+  const rsm=e.target.closest('[data-resume]'); if(rsm){ const item=HELD[+rsm.dataset.resume]; if(CART.length){ try{ const r=await api('/api/held','POST',{type:'hold',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Held just now'}); HELD.push(r.held); }catch(err){} } CART=item.lines.map(l=>({...l})); if(item.id!=null){ try{ await api('/api/held/'+item.id,'DELETE'); }catch(err){} } HELD=HELD.filter(h=>h!==item); showParked=false;
+    if(item.type==='await'){ view='checkout'; payMethod='mpesa'; payStage='waiting'; render(); startStkCountdown(120); return; }
+    render(); return; }
   const drp=e.target.closest('[data-drop]'); if(drp){ const item=HELD[+drp.dataset.drop]; HELD.splice(+drp.dataset.drop,1); if(item&&item.id!=null){ try{ await api('/api/held/'+item.id,'DELETE'); }catch(err){} } render(); return; }
 
   // discount and manager approval
