@@ -537,7 +537,12 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, buildCatalogue());
     }
     if (p === '/products.json' && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      // Always-live catalogue for the shop website. CORS open so the site can read it from any host.
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+      });
       return res.end(JSON.stringify(buildCatalogue()));
     }
     if (p === '/api/catalogue/publish' && method === 'POST') {
