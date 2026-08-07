@@ -113,6 +113,7 @@ function saleOut(s) {
   const cogs = lines.reduce((t, l) => t + (l.cost || 0) * l.qty, 0);
   return {
     t: (s.datetime || '').slice(11, 16) || (s.datetime || ''),
+    date: (s.datetime || '').slice(0, 10),
     ref: s.ref,
     cust: s.customer,
     method: METHOD_LABEL[s.method] || s.method,

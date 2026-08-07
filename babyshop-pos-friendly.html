@@ -874,7 +874,7 @@ function sell(){
         <div class="who">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 21a6.5 6.5 0 0113 0"/></svg></div>
           <div><div class="nm">${saleCustomer?saleCustomer.name:'Walk-in customer'}</div><div class="dt">${saleCustomer?saleCustomer.detail:'Add a name for the receipt'}</div></div>
-          <button class="chg">${saleCustomer?'Change':'Add'}</button>
+          <button class="chg" data-setcust>${saleCustomer?'Change':'Add'}</button>
         </div>
       </div>
       ${parkedPanel()}
@@ -1320,14 +1320,20 @@ function settings(){
 
 /* -------- REPORTS: sales and transactions -------- */
 function reports(){
-  const total=TXNS.reduce((t,x)=>t+x.amt,0);
-  const count=TXNS.length;
+  const ymd=dt=>{const z=new Date(dt);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0');};
+  const today=ymd(new Date()), yest=ymd(new Date(Date.now()-864e5)), weekAgo=ymd(new Date(Date.now()-6*864e5));
+  const inRange=d=> !d ? true : (repRange==='today'?d===today: repRange==='yesterday'?d===yest: d>=weekAgo);
+  const rlabel=repRange==='today'?'Today':repRange==='yesterday'?'Yesterday':'Last 7 days';
+  const shown=TXNS.filter(x=>inRange(x.date));
+  const expShown=EXPENSES.filter(x=>inRange((x.on||'').slice(0,10)));
+  const total=shown.reduce((t,x)=>t+x.amt,0);
+  const count=shown.length;
   const byM={'M-PESA':0,'Card':0,'Cash':0};
-  TXNS.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
-  const itemsSold=TXNS.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
+  shown.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
+  const itemsSold=shown.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
   const avg=count?Math.round(total/count):0;
-  const grossProfit=TXNS.reduce((t,x)=>t+(x.profit||0),0);   // sales revenue minus stock cost
-  const expTotal=EXPENSES.reduce((t,x)=>t+(x.amount||0),0);
+  const grossProfit=shown.reduce((t,x)=>t+(x.profit||0),0);   // sales revenue minus stock cost
+  const expTotal=expShown.reduce((t,x)=>t+(x.amount||0),0);
   const finalProfit=grossProfit-expTotal;
   const pct=v=>total?Math.round(v/total*100):0;
   const cashExpected=3000+byM['Cash'];
@@ -1361,10 +1367,10 @@ function reports(){
     </div>
   </div>
   <div class="panel" style="margin-top:16px">
-    <div class="pt"><h3>Today's sales${repMethod?' · '+repMethod:''}</h3><span class="badge">${TXNS.filter(x=>!repMethod||x.method===repMethod).length} sales</span>${repMethod?`<button class="btn sm" data-repmethod="all" style="margin-left:10px">Show all</button>`:''}</div>
+    <div class="pt"><h3>${rlabel} sales${repMethod?' · '+repMethod:''}</h3><span class="badge">${shown.filter(x=>!repMethod||x.method===repMethod).length} sales</span>${repMethod?`<button class="btn sm" data-repmethod="all" style="margin-left:10px">Show all</button>`:''}</div>
     <div style="padding:14px 16px">
-      ${TXNS.filter(x=>!repMethod||x.method===repMethod).length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">No ${repMethod} sales yet today.</div>`:''}
-      ${TXNS.map((x,i)=>{ if(repMethod&&x.method!==repMethod) return ''; return `<div class="txn ${openTxn===i?'open':''}">
+      ${shown.filter(x=>!repMethod||x.method===repMethod).length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">No ${repMethod||''} sales in this range.</div>`:''}
+      ${shown.map((x,i)=>{ if(repMethod&&x.method!==repMethod) return ''; return `<div class="txn ${openTxn===i?'open':''}">
         <div class="txn-head" data-txn="${i}">
           <div class="txn-time num">${x.t}</div>
           <div class="txn-main"><div class="txn-ref">Sale ${x.ref} · ${x.cust}</div><div class="txn-sub">${x.items.reduce((a,it)=>a+it[1],0)} items · ${x.cashier}</div></div>
@@ -1374,7 +1380,8 @@ function reports(){
         </div>
         ${openTxn===i?`<div class="txn-body">
           ${x.items.map(it=>`<div class="txn-line"><span>${it[1]} × ${it[0]}</span><span class="num">KSh ${money(it[1]*it[2])}</span></div>`).join('')}
-          <div class="txn-actions"><button class="btn sm">Print receipt again</button><button class="btn sm">Send on WhatsApp</button><button class="btn sm">Start a return</button></div>
+          ${x.mpesaRef?`<div class="txn-line"><span>M-PESA code</span><span class="num">${x.mpesaRef}</span></div>`:''}
+          <div class="txn-actions"><button class="btn sm" data-reprint="${x.ref}">Print receipt again</button><button class="btn sm" data-startreturn>Start a return</button></div>
         </div>`:''}
       </div>`; }).join('')}
     </div>
@@ -1384,7 +1391,7 @@ function reports(){
     <div class="set-row"><div><div class="t">Cash that should be in the drawer</div><div class="d">Opening float of 3,000 plus cash sales</div></div><div class="val num">KSh ${money(cashExpected)}</div></div>
     <div class="set-row"><div><div class="t">M-PESA received to the till</div><div class="d">Buy Goods ${SHOP.till}</div></div><div class="val num">KSh ${money(byM['M-PESA'])}</div></div>
     <div class="set-row"><div><div class="t">Card received</div><div class="d">Equity terminal</div></div><div class="val num">KSh ${money(byM['Card'])}</div></div>
-    <div style="padding:16px 20px"><button class="btn green">Count the cash and print the Z report</button></div>
+    <div style="padding:16px 20px"><button class="btn green" data-zreport>Count the cash and print the Z report</button></div>
   </div>`;
 }
 
@@ -1443,7 +1450,38 @@ async function connectPrinter(which,method){ const d=DEVICES[which]; try{
   }catch(err){ d.connected=true; d.demo=true; d.method=(method||'usb').toUpperCase(); d.name='Sample printer (demo)'; toast('Connected in demo mode'); }
   render();
 }
-function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px;text-align:center;color:#98897d;font-family:Nunito,sans-serif;font-weight:700">No sales yet to print.</div>';
+// Open a print window with any HTML body (used for reprints and the Z report).
+function printHTML(title, body, css){ const w=window.open('','_blank','width=430,height=650'); if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); return; } w.document.write('<!doctype html><html><head><title>'+title+'</title>'+(css||'')+'</head><body>'+body+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250)}<'+'/script></body></html>'); w.document.close(); }
+// End-of-day Z report for the range currently selected in Reports.
+function zReportHTML(){
+  const ymd=dt=>{const z=new Date(dt);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0');};
+  const today=ymd(new Date()), yest=ymd(new Date(Date.now()-864e5)), weekAgo=ymd(new Date(Date.now()-6*864e5));
+  const inRange=d=> !d?true:(repRange==='today'?d===today:repRange==='yesterday'?d===yest:d>=weekAgo);
+  const rlabel=repRange==='today'?'Today':repRange==='yesterday'?'Yesterday':'Last 7 days';
+  const shown=TXNS.filter(x=>inRange(x.date)), exp=EXPENSES.filter(x=>inRange((x.on||'').slice(0,10)));
+  const count=shown.length, total=shown.reduce((t,x)=>t+x.amt,0);
+  const byM={'M-PESA':0,'Card':0,'Cash':0}; shown.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
+  const items=shown.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
+  const profit=shown.reduce((t,x)=>t+(x.profit||0),0), expTotal=exp.reduce((t,x)=>t+(x.amount||0),0);
+  const cashExpected=3000+byM['Cash'];
+  const row=(l,v,strong)=>`<div style="display:flex;justify-content:space-between;padding:4px 0;${strong?'font-weight:800;border-top:1px solid #000;margin-top:4px;padding-top:7px':''}"><span>${l}</span><span>${v}</span></div>`;
+  return `<div style="width:300px;max-width:100%;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;color:#111;font-size:13px">
+    <div style="text-align:center;font-weight:800;font-size:15px">${SHOP.name}</div>
+    <div style="text-align:center">${SHOP.branch} · Till ${SHOP.till}</div>
+    <div style="text-align:center;margin:6px 0 10px">Z REPORT · ${rlabel}<br>${new Date().toLocaleString('en-GB')}</div>
+    <div style="border-top:2px dashed #000;padding-top:8px">
+      ${row('Sales',count)}${row('Items sold',items)}${row('Gross sales','KSh '+money(total))}
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
+      ${row('M-PESA','KSh '+money(byM['M-PESA']))}${row('Card','KSh '+money(byM['Card']))}${row('Cash','KSh '+money(byM['Cash']))}
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
+      ${row('Opening float','KSh '+money(3000))}${row('Cash expected in drawer','KSh '+money(cashExpected),true)}
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
+      ${row('Profit from sales','KSh '+money(profit))}${row('Expenses','− KSh '+money(expTotal))}${row('Final profit','KSh '+money(profit-expTotal),true)}
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:11px">Counted by ${currentUser?currentUser.name:''}</div>
+  </div>`;
+}
+function receiptHTML(t){ t=t||TXNS[0]; if(!t) return '<div style="padding:30px;text-align:center;color:#98897d;font-family:Nunito,sans-serif;font-weight:700">No sales yet to print.</div>';
   const registered=setOn('vat_registered',false);
   const vat=(t.vat!==undefined&&t.vat!==null)?t.vat:0;
   const dateStr=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
@@ -1692,6 +1730,10 @@ screen.addEventListener('click',async e=>{
   // settings and generic controls
   const set=e.target.closest('[data-set]'); if(set){setTab=set.dataset.set; render(); return;}
   // settings: save the VAT rate to the server
+  const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), '<style>@page{margin:8mm}body{margin:0;background:#fff}</style>'); toast('Z report ready to print'); return; }
+  const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), receiptHTML(t), '<style>@page{margin:6mm}body{margin:0;background:#fff}</style>'); return; }
+  const sret=e.target.closest('[data-startreturn]'); if(sret){ view='returns'; render(); return; }
+  const scst=e.target.closest('[data-setcust]'); if(scst){ const nm=prompt('Customer name for the receipt', saleCustomer?saleCustomer.name:''); if(nm!==null){ const n=nm.trim(); saleCustomer = n ? {name:n, detail:'Added at the till'} : null; render(); } return; }
   const svat=e.target.closest('[data-savevat]'); if(svat){ const el=document.getElementById('vatInput'); let v=parseInt((el&&el.value||'').replace(/\D/g,'')); if(!Number.isFinite(v)||v<0||v>100){ toast('VAT rate must be a whole number from 0 to 100',true); if(el)el.focus(); return; } try{ const r=await api('/api/settings','PATCH',{vat_rate:v}); if(r.shop&&r.shop.vat_rate!==undefined)SHOP.vat=Number(r.shop.vat_rate); toast('VAT rate saved: '+SHOP.vat+'%'); }catch(err){ toast('Could not save the VAT rate',true); } render(); return; }
   // stock: change a product's VAT status (standard / exempt)
   const pvat=e.target.closest('[data-prodvat]'); if(pvat){ const id=+pvat.dataset.prodvat; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.vt==='exempt'?'standard':'exempt'; try{ const r=await api('/api/products/'+id,'PATCH',{vat_type:next}); if(r.product){ Object.assign(prod,r.product); } toast(next==='exempt'?'Marked VAT exempt':'Marked standard VAT'); }catch(err){ toast('Could not change VAT status',true); } render(); } return; }
