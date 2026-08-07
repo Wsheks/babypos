@@ -72,7 +72,7 @@ const TOGGLE_KEYS = [
 // ---------------------------------------------------------------
 function productOut(r) {
   return { id: r.id, n: r.name, a: r.age_range, p: r.selling_price, s: r.stock_qty,
-           c: r.cost_price, sku: r.sku, bc: r.barcode, recv: r.received,
+           c: r.cost_price, w: r.wholesale_price || 0, sku: r.sku, bc: r.barcode, recv: r.received,
            vt: r.vat_type || 'standard',
            category: r.category || '', kind: r.kind || '',
            ageMin: r.age_min, ageMax: r.age_max,
@@ -329,10 +329,10 @@ function addProduct(body) {
   const sizes = Array.isArray(body.sizes) ? body.sizes : [];
   const colours = Array.isArray(body.colours) ? body.colours : [];
   const id = db.prepare(
-    `INSERT INTO products (name, age_range, category, cost_price, selling_price, stock_qty, sku, barcode, received, created_at, vat_type,
+    `INSERT INTO products (name, age_range, category, cost_price, selling_price, wholesale_price, stock_qty, sku, barcode, received, created_at, vat_type,
        kind, age_min, age_max, sizes, colours, was_price, image, online, featured)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'today', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(body.n, body.a || 'All ages', body.category || null, Number(body.c) || 0, Number(body.p) || 0, Number(body.s) || 0,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'today', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(body.n, body.a || 'All ages', body.category || null, Number(body.c) || 0, Number(body.p) || 0, Number(body.w) || 0, Number(body.s) || 0,
         sku, null, now(), vatType,
         kind, ages.min, ages.max, JSON.stringify(sizes), JSON.stringify(colours),
         Number(body.was_price) || null, body.image || null,
@@ -566,6 +566,9 @@ const server = http.createServer(async (req, res) => {
       if (!prod) return sendJSON(res, 404, { error: 'no such product' });
       const set = (col, val) => db.prepare(`UPDATE products SET ${col} = ? WHERE id = ?`).run(val, prod.id);
       if (body.vat_type !== undefined) set('vat_type', body.vat_type === 'exempt' ? 'exempt' : 'standard');
+      if (body.p !== undefined) set('selling_price', Number(body.p) || 0);
+      if (body.c !== undefined) set('cost_price', Number(body.c) || 0);
+      if (body.w !== undefined) set('wholesale_price', Number(body.w) || 0);
       if (body.category !== undefined) set('category', body.category || null);
       if (body.kind !== undefined) set('kind', body.kind || null);
       if (body.sizes !== undefined) set('sizes', JSON.stringify(Array.isArray(body.sizes) ? body.sizes : []));

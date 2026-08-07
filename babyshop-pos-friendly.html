@@ -1079,6 +1079,7 @@ function productsPanel(){
       <div class="field"><label>Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric"></div>
       <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
       <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
+      <div class="field"><label>Wholesale price (KSh)</label><input id="np-whole" placeholder="e.g. 1800 (optional)" inputmode="numeric"></div>
       <div class="field" style="grid-column:1 / -1"><label>VAT</label><select id="np-vat" class="sel" style="padding:12px 14px;width:100%"><option value="standard">Standard rate${setOn('vat_registered',false)?` (${SHOP.vat}%, included in the price)`:' (VAT applies once you register)'}</option><option value="exempt">VAT exempt (never carries VAT)</option></select></div>
       <div class="field" style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:12px"><label style="color:var(--sun-d)">For the shop website</label></div>
       <div class="field"><label>Category</label><input id="np-category" placeholder="e.g. Newborn, Tops, Warmth"></div>
@@ -1115,7 +1116,7 @@ function productsPanel(){
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
         </div>
         <div class="ir-right">
-          <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
+          <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin${pr.w?` · wholesale ${money(pr.w)}`:''}</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
           <span class="pill ${pr.s<5?'warn':'ok'}">${pr.s} in stock</span>
           ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button></div>`:''}
         </div>
@@ -1516,7 +1517,7 @@ screen.addEventListener('click',async e=>{
     const name=(g('np-name').value||'').trim(); if(!name){ g('np-name').focus(); return; }
     const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
     const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
-    const body={ n:name, a:(g('np-age').value||'').trim()||'All ages', p:num(g('np-price').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
+    const body={ n:name, a:(g('np-age').value||'').trim()||'All ages', p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(val('np-category')||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
     try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
