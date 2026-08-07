@@ -178,6 +178,16 @@ CREATE TABLE IF NOT EXISTS resets (
   username   TEXT,
   expires_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  description TEXT,
+  category    TEXT,
+  amount      INTEGER NOT NULL DEFAULT 0,
+  spent_on    TEXT,   -- YYYY-MM-DD the money was spent
+  cashier     TEXT,
+  created_at  TEXT
+);
 `);
 
 // ---------------------------------------------------------------

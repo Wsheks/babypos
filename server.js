@@ -106,7 +106,11 @@ function allProducts() {
   return db.prepare('SELECT * FROM products ORDER BY id').all().map(productOut);
 }
 function saleOut(s) {
-  const lines = db.prepare('SELECT * FROM sale_lines WHERE sale_id = ?').all(s.id);
+  // join each line to its product cost so we can report the margin on the sale
+  const lines = db.prepare(
+    'SELECT sl.*, p.cost_price AS cost FROM sale_lines sl LEFT JOIN products p ON p.id = sl.product_id WHERE sl.sale_id = ?'
+  ).all(s.id);
+  const cogs = lines.reduce((t, l) => t + (l.cost || 0) * l.qty, 0);
   return {
     t: (s.datetime || '').slice(11, 16) || (s.datetime || ''),
     ref: s.ref,
@@ -114,10 +118,25 @@ function saleOut(s) {
     method: METHOD_LABEL[s.method] || s.method,
     amt: s.total,
     vat: s.vat,
+    profit: s.total - cogs,   // gross profit = what she paid minus what the stock cost
     mpesaRef: s.mpesa_ref || null,
     cashier: s.cashier,
     items: lines.map(l => [l.name, l.qty, l.unit_price]),
   };
+}
+function expenseOut(r) {
+  return { id: r.id, desc: r.description || '', category: r.category || '', amount: r.amount || 0, on: r.spent_on || '', cashier: r.cashier || '' };
+}
+function allExpenses() {
+  return db.prepare('SELECT * FROM expenses ORDER BY spent_on DESC, id DESC').all().map(expenseOut);
+}
+function addExpense(body) {
+  const id = db.prepare(
+    `INSERT INTO expenses (description, category, amount, spent_on, cashier, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(String(body.desc || '').trim() || 'Expense', String(body.category || '').trim() || 'General',
+        Math.max(0, Math.round(Number(body.amount) || 0)),
+        (body.on && String(body.on).slice(0, 10)) || now().slice(0, 10), body.cashier || null, now()).lastInsertRowid;
+  return expenseOut(db.prepare('SELECT * FROM expenses WHERE id = ?').get(id));
 }
 function allSales() {
   return db.prepare('SELECT * FROM sales ORDER BY datetime DESC, id DESC').all().map(saleOut);
@@ -407,7 +426,19 @@ const server = http.createServer(async (req, res) => {
         staff: allStaffPublic(),
         intake: del.intake,
         delivery: del.delivery,
+        expenses: allExpenses(),
       });
+    }
+
+    // Expenses (shop running costs). Recording gated on the client to owner/manager.
+    if (p === '/api/expenses' && method === 'POST') {
+      const body = await readBody(req);
+      return sendJSON(res, 200, { expense: addExpense(body) });
+    }
+    const expDel = p.match(/^\/api\/expenses\/(\d+)$/);
+    if (expDel && method === 'DELETE') {
+      db.prepare('DELETE FROM expenses WHERE id = ?').run(Number(expDel[1]));
+      return sendJSON(res, 200, { ok: true });
     }
 
     // Change your own password (needs your current one).

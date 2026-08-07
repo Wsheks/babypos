@@ -673,6 +673,7 @@ function can(i){ const ri=roleIdx(); return ri>=0 && !!RIGHTS[i][1][ri]; }
 /* -------- held sales, online orders, discount -------- */
 let HELD = [];       // parked sales, loaded in boot()
 let ORDERS = [];     // online orders, loaded in boot()
+let EXPENSES = [];   // shop running costs, loaded in boot()
 let orderFilter=null; // Orders screen: which status card is selected (null = show all)
 let saleDiscount=0, discPending=0, showParked=false;
 let mobileTab='products';   // Sell screen on phones: 'products' or 'cart'
@@ -684,7 +685,7 @@ const quickTenders = t => { const up=s=>(Math.floor(t/s)+1)*s; return [t, up(500
 /* -------- navigation (built from rights) -------- */
 const NAV = [
   {key:'sell', label:'Sell', need:()=>can(0), icon:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.4 12.4a1 1 0 001 .8h9.2a1 1 0 001-.8L21 7H6"/>'},
-  {key:'orders', label:'Orders', need:()=>can(0)||currentUser.role==='Rider', badge:()=>ORDERS.filter(o=>o.st==='new').length, icon:'<path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 016 0"/>'},
+  {key:'expenses', label:'Expenses', need:()=>can(7)||can(8), icon:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14h2"/>'},
   {key:'stock', label:'Stock', need:()=>can(3)||can(4), icon:'<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>'},
   {key:'reports', label:'Reports', need:()=>can(7)||can(8), icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'},
   {key:'returns', label:'Returns', need:()=>can(0), icon:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 015 5v0a5 5 0 01-5 5H8"/>'},
@@ -1324,7 +1325,10 @@ function reports(){
   const byM={'M-PESA':0,'Card':0,'Cash':0};
   TXNS.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
   const itemsSold=TXNS.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
-  const avg=Math.round(total/count);
+  const avg=count?Math.round(total/count):0;
+  const grossProfit=TXNS.reduce((t,x)=>t+(x.profit||0),0);   // sales revenue minus stock cost
+  const expTotal=EXPENSES.reduce((t,x)=>t+(x.amount||0),0);
+  const finalProfit=grossProfit-expTotal;
   const pct=v=>total?Math.round(v/total*100):0;
   const cashExpected=3000+byM['Cash'];
   const mpill={'M-PESA':'mpesa','Card':'card','Cash':'cash'};
@@ -1337,6 +1341,12 @@ function reports(){
     <div class="stat"><div class="l">Average sale</div><div class="v num">${money(avg)}</div></div>
     <div class="stat"><div class="l">Items sold</div><div class="v num">${itemsSold}</div></div>
   </div>
+  ${can(7)?`<div class="panel" style="padding:18px 20px;margin-bottom:16px">
+    <div class="pt" style="padding:0 0 12px"><h3>Profit</h3></div>
+    <div class="set-row"><div><div class="t">Profit from sales</div><div class="d">What you sold, minus what the stock cost you</div></div><div class="val num">KSh ${money(grossProfit)}</div></div>
+    <div class="set-row"><div><div class="t">Expenses</div><div class="d">Rent, salaries, transport and the rest</div></div><div class="val num" style="color:var(--stop)">− KSh ${money(expTotal)}</div></div>
+    <div class="set-row" style="border-top:2px solid var(--line2)"><div><div class="t" style="font-size:16px">Final profit</div><div class="d">After expenses are taken off</div></div><div class="val num baloo" style="font-size:21px;color:${finalProfit>=0?'var(--mpesa)':'var(--stop)'}">KSh ${money(finalProfit)}</div></div>
+  </div>`:''}
   <div class="panel" style="padding:18px 20px">
     <div class="pt" style="padding:0 0 12px"><h3>Money by method</h3></div>
     <div class="mbar">
@@ -1375,6 +1385,38 @@ function reports(){
     <div class="set-row"><div><div class="t">M-PESA received to the till</div><div class="d">Buy Goods ${SHOP.till}</div></div><div class="val num">KSh ${money(byM['M-PESA'])}</div></div>
     <div class="set-row"><div><div class="t">Card received</div><div class="d">Equity terminal</div></div><div class="val num">KSh ${money(byM['Card'])}</div></div>
     <div style="padding:16px 20px"><button class="btn green">Count the cash and print the Z report</button></div>
+  </div>`;
+}
+
+/* -------- EXPENSES: shop running costs (rent, salaries, transport...) -------- */
+const EXP_CATS=['Rent','Salaries','Restock','Transport','Utilities','Airtime & data','Packaging','Other'];
+function expenses(){
+  const today=new Date().toISOString().slice(0,10), month=today.slice(0,7);
+  const sum=list=>list.reduce((t,x)=>t+(x.amount||0),0);
+  const totalExp=sum(EXPENSES);
+  const todayExp=sum(EXPENSES.filter(x=>(x.on||'').slice(0,10)===today));
+  const monthExp=sum(EXPENSES.filter(x=>(x.on||'').slice(0,7)===month));
+  return `<div class="phead"><h2>Expenses</h2><p>Record what the shop spends, like rent, salaries, transport and restocking. These are taken off your profit in Reports.</p></div>
+  <div class="stats">
+    <div class="stat"><div class="l">Spent today</div><div class="v num">${money(todayExp)}</div></div>
+    <div class="stat"><div class="l">This month</div><div class="v num">${money(monthExp)}</div></div>
+    <div class="stat"><div class="l">All time</div><div class="v num">${money(totalExp)}</div></div>
+    <div class="stat"><div class="l">Entries</div><div class="v num">${EXPENSES.length}</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px;align-items:start">
+    <div class="co-card">
+      <h3 style="margin-bottom:12px">Add an expense</h3>
+      <div class="fld"><label>What was it for</label><input id="exp-desc" placeholder="e.g. Shop rent for August"></div>
+      <div class="fld"><label>Amount (KSh)</label><input id="exp-amt" inputmode="numeric" placeholder="0"></div>
+      <div class="fld"><label>Category</label><select id="exp-cat" class="sel" style="width:100%;padding:12px 14px">${EXP_CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="fld"><label>Date</label><input id="exp-date" type="date" value="${today}"></div>
+      <button class="bigbtn" data-expadd style="margin-top:6px">${stkIcon} Save this expense</button>
+    </div>
+    <div class="co-card">
+      <div class="pt" style="padding:0 0 10px"><h3>Recent expenses</h3><span class="badge">KSh ${money(totalExp)} total</span></div>
+      ${EXPENSES.length===0?`<div style="text-align:center;color:var(--mut);padding:28px 8px;font-weight:600">No expenses recorded yet. Add your first one on the left.</div>`:''}
+      ${EXPENSES.map((x,i)=>`<div class="ln" style="align-items:center"><div><div style="font-weight:700">${x.desc}</div><div class="q">${x.category}${x.on?' · '+x.on:''}</div></div><div style="display:flex;align-items:center;gap:10px"><b class="num">KSh ${money(x.amount)}</b>${can(8)?`<button class="btn ghost sm" data-expdel="${i}" style="color:var(--stop);padding:6px 8px">Remove</button>`:''}</div></div>`).join('')}
+    </div>
   </div>`;
 }
 
@@ -1509,11 +1551,11 @@ function devicesBody(){ const c=caps();
 }
 
 /* -------- runtime -------- */
-const VIEWS = {sell, checkout, orders, stock, reports, returns, settings};
+const VIEWS = {sell, checkout, expenses, stock, reports, returns, settings};
 const TITLES = {
   sell:['Good afternoon, Njeri','ilekela Baby & Kids, Utawala'],
   checkout:['Take payment','ilekela Baby & Kids, Utawala'],
-  orders:['Online orders','ilekela Baby & Kids, Utawala'],
+  expenses:['Expenses','ilekela Baby & Kids, Utawala'],
   stock:['Products and stock','ilekela Baby & Kids, Utawala'],
   reports:['Sales and reports','ilekela Baby & Kids, Utawala'],
   returns:['Returns and swaps','ilekela Baby & Kids, Utawala'],
@@ -1570,6 +1612,20 @@ screen.addEventListener('click',async e=>{
   const inc=e.target.closest('[data-inc]'); if(inc){ CART[+inc.dataset.inc].q++; render(); return; }
   const dec=e.target.closest('[data-dec]'); if(dec){ const i=+dec.dataset.dec; CART[i].q--; if(CART[i].q<1)CART.splice(i,1); render(); return; }
   const clr=e.target.closest('[data-clear]'); if(clr){ CART=[]; render(); return; }
+
+  // expenses: add / remove
+  const expa=e.target.closest('[data-expadd]'); if(expa){
+    const g=id=>document.getElementById(id);
+    const desc=(g('exp-desc').value||'').trim();
+    const amount=parseInt((g('exp-amt').value||'').replace(/\D/g,''))||0;
+    if(!desc){ toast('What was the expense for?',true); g('exp-desc').focus(); return; }
+    if(amount<=0){ toast('Enter the amount',true); g('exp-amt').focus(); return; }
+    const category=g('exp-cat').value, on=g('exp-date').value||new Date().toISOString().slice(0,10);
+    try{ const r=await api('/api/expenses','POST',{desc,amount,category,on,cashier:currentUser?currentUser.name:''}); EXPENSES.unshift(r.expense); toast('Expense saved'); }
+    catch(err){ toast('Could not save the expense',true); }
+    render(); return;
+  }
+  const expd=e.target.closest('[data-expdel]'); if(expd){ const item=EXPENSES[+expd.dataset.expdel]; if(item && confirm('Remove this expense?')){ try{ await api('/api/expenses/'+item.id,'DELETE'); EXPENSES=EXPENSES.filter(x=>x!==item); toast('Expense removed'); }catch(err){ toast('Could not remove it',true); } render(); } return; }
 
   // stock: products / deliveries / add product / accept delivery
   const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
@@ -1750,7 +1806,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[];
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[];
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}
