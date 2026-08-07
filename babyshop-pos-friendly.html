@@ -208,6 +208,11 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .list{padding:6px 0}
 .item-row{display:grid;grid-template-columns:auto 1fr auto;gap:15px;padding:16px 20px;border-bottom:1px solid var(--line2);align-items:center;transition:background .12s}
 .item-row:hover{background:#f8fbfc}
+.price-edit{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;padding:14px 20px;background:var(--paper);border-bottom:1px solid var(--line2)}
+.price-edit .pe-fld{display:flex;flex-direction:column;gap:5px}
+.price-edit label{font-size:12px;font-weight:700;color:var(--ink2)}
+.price-edit input{width:120px;border:2px solid var(--line2);border-radius:10px;padding:9px 11px;font:inherit;font-weight:800;font-family:"Baloo 2";font-size:15px;background:#fff}
+.price-edit input:focus{border-color:var(--sun);outline:none}
 .item-row:last-child{border-bottom:0}
 .thumb{width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
 .thumb svg{width:24px;height:24px;opacity:.7}
@@ -642,7 +647,7 @@ let INTAKE = [];     // pending delivery lines, loaded in boot()
 let DELIVERY = null; // pending delivery header, loaded in boot()
 let RETURNS = [];    // loaded in boot()
 let TXNS = [];       // today's sales, loaded in boot()
-let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1;
+let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1, editPrice=null;
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
 const ROLES = [
@@ -1162,15 +1167,21 @@ function productsPanel(){
       ${shownProds.map(pr=>`<div class="item-row">
         <div class="thumb">${babyIcon}</div>
         <div>
-          <div class="ir-nm">${pr.n}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}</div>
+          <div class="ir-nm">${pr.n}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
         </div>
         <div class="ir-right">
           <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin${pr.w?` · wholesale ${money(pr.w)}`:''}</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
           <span class="pill ${pr.s<5?'warn':'ok'}">${pr.s} in stock</span>
-          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button><button class="btn ghost sm" data-prodlabel="${pr.id}" style="padding:5px 4px;font-size:12px">Print labels</button></div>`:''}
+          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodedit="${pr.id}" style="padding:5px 8px;font-size:12px">Edit prices</button><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button><button class="btn ghost sm" data-prodlabel="${pr.id}" style="padding:5px 4px;font-size:12px">Print labels</button></div>`:''}
         </div>
-      </div>`).join('')}
+      </div>${(can(4)&&editPrice===pr.id)?`<div class="price-edit">
+        <div class="pe-fld"><label>Selling price (KSh)</label><input id="ep-p-${pr.id}" inputmode="numeric" value="${pr.p||''}"></div>
+        <div class="pe-fld"><label>Cost price (KSh)</label><input id="ep-c-${pr.id}" inputmode="numeric" value="${pr.c||''}"></div>
+        <div class="pe-fld"><label>Wholesale (KSh)</label><input id="ep-w-${pr.id}" inputmode="numeric" value="${pr.w||''}"></div>
+        <button class="btn green sm" data-prodsave="${pr.id}">Save</button>
+        <button class="btn sm" data-prodcancel>Cancel</button>
+      </div>`:''}`).join('')}
     </div>
   </div>`;
 }
@@ -1739,6 +1750,16 @@ screen.addEventListener('click',async e=>{
   const pvat=e.target.closest('[data-prodvat]'); if(pvat){ const id=+pvat.dataset.prodvat; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.vt==='exempt'?'standard':'exempt'; try{ const r=await api('/api/products/'+id,'PATCH',{vat_type:next}); if(r.product){ Object.assign(prod,r.product); } toast(next==='exempt'?'Marked VAT exempt':'Marked standard VAT'); }catch(err){ toast('Could not change VAT status',true); } render(); } return; }
   // stock: put a product on / off the shop website
   const plab=e.target.closest('[data-prodlabel]'); if(plab){ openLabelFor(+plab.dataset.prodlabel); return; }
+  const pedit=e.target.closest('[data-prodedit]'); if(pedit){ editPrice=+pedit.dataset.prodedit; render(); const f=document.getElementById('ep-p-'+editPrice); if(f){ f.focus(); f.select(); } return; }
+  const pcanc=e.target.closest('[data-prodcancel]'); if(pcanc){ editPrice=null; render(); return; }
+  const psave=e.target.closest('[data-prodsave]'); if(psave){ const id=+psave.dataset.prodsave; const g=k=>parseInt((document.getElementById('ep-'+k+'-'+id)||{}).value||'',10)||0;
+    const p=g('p'), c=g('c'), w=g('w'); const prod=PRODUCTS.find(x=>x.id===id);
+    if(p<=0){ toast('Selling price must be more than 0',true); return; }
+    if(c>p) toast('Note: cost is higher than the selling price');
+    try{ const r=await api('/api/products/'+id,'PATCH',{p,c,w}); if(r.product&&prod){ Object.assign(prod,r.product); } editPrice=null; toast('Prices saved'); }
+    catch(err){ toast('Could not save the prices',true); }
+    render(); return;
+  }
   const ponl=e.target.closest('[data-prodonline]'); if(ponl){ const id=+ponl.dataset.prodonline; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.online!==0?0:1; try{ const r=await api('/api/products/'+id,'PATCH',{online:next}); if(r.product){ Object.assign(prod,r.product); } toast(next?'Now on the website':'Taken off the website'); }catch(err){ toast('Could not change website status',true); } render(); } return; }
   // channels: publish the catalogue to the website
   const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
