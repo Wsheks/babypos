@@ -114,6 +114,7 @@ function saleOut(s) {
     method: METHOD_LABEL[s.method] || s.method,
     amt: s.total,
     vat: s.vat,
+    mpesaRef: s.mpesa_ref || null,
     cashier: s.cashier,
     items: lines.map(l => [l.name, l.qty, l.unit_price]),
   };
@@ -246,10 +247,11 @@ function recordSale(body) { return transaction(() => {
   const dt = localStamp();
 
   const saleId = db.prepare(
-    `INSERT INTO sales (ref, datetime, cashier, customer, subtotal, discount_pct, discount_amount, vat, total, method, split_parts, status, channel)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?)`
+    `INSERT INTO sales (ref, datetime, cashier, customer, subtotal, discount_pct, discount_amount, vat, total, method, split_parts, status, channel, mpesa_ref)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`
   ).run(ref, dt, body.cashier || null, body.customer || 'Walk-in', subtotal, discPct, discAmount, vat, total,
-        method, body.splitParts ? JSON.stringify(body.splitParts) : null, body.channel || 'counter').lastInsertRowid;
+        method, body.splitParts ? JSON.stringify(body.splitParts) : null, body.channel || 'counter',
+        body.mpesaRef ? String(body.mpesaRef).trim().toUpperCase() : null).lastInsertRowid;
 
   const insLine = db.prepare(
     `INSERT INTO sale_lines (sale_id, product_id, name, age_range, qty, unit_price) VALUES (?, ?, ?, ?, ?, ?)`);

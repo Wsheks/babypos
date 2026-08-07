@@ -202,6 +202,7 @@ ensureColumn('products', 'image', 'TEXT');
 ensureColumn('products', 'online', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('products', 'featured', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('products', 'wholesale_price', 'INTEGER NOT NULL DEFAULT 0');  // bulk/reseller price
+ensureColumn('sales', 'mpesa_ref', 'TEXT');  // customer's M-PESA confirmation code, when entered manually
 
 // ---------------------------------------------------------------
 //  Seed once. Data ported verbatim from the prototype so the first

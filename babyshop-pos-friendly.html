@@ -906,6 +906,7 @@ function sell(){
 
 /* -------- CHECKOUT (a step inside the sale, not a menu item) -------- */
 let payMethod='mpesa', payStage='choose', cashGiven=0, splitParts=[], paidAmount=0, paidChange=0, paidTendered=0;
+let matchOpen=false, mpesaCode='', paidRef='';
 let stkTimer=null;
 // Live countdown on the M-PESA waiting screen. Restarts each time a request is sent.
 function startStkCountdown(seconds){
@@ -916,7 +917,25 @@ function startStkCountdown(seconds){
     const m=Math.floor(left/60), s=left%60; el.textContent=m+':'+String(s).padStart(2,'0'); left--; };
   tick(); stkTimer=setInterval(tick,1000);
 }
-function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;paidChange=0;paidTendered=0;clearInterval(stkTimer);}
+function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;paidChange=0;paidTendered=0;matchOpen=false;mpesaCode='';paidRef='';clearInterval(stkTimer);}
+// Close the sale on the server, mark it paid and move to the receipt step.
+async function finishSale(){
+  paidAmount=dueT();
+  paidTendered = payMethod==='cash' ? cashGiven : dueT();
+  paidChange = payMethod==='cash' ? Math.max(0, cashGiven-dueT()) : 0;
+  paidRef = mpesaCode || '';
+  try{
+    const r=await api('/api/sales','POST',{
+      lines:CART.map(l=>({id:l.id,n:l.n,a:l.a,q:l.q,p:l.p})),
+      method:payMethod, discountPct:0, discountAmount:saleDiscount, total:dueT(),
+      customer:saleCustomer?saleCustomer.name:'Walk-in', cashier:currentUser?currentUser.name:'',
+      splitParts:payMethod==='split'?splitParts:null, channel:'counter', mpesaRef:mpesaCode||null
+    });
+    PRODUCTS=r.products; TXNS.unshift(r.sale);
+  }catch(err){ toast('Paid on screen, but the sale did not reach the server',true); }
+  clearInterval(stkTimer);
+  payStage='done'; render();
+}
 // Apply a manual KSh discount. Over 10% of the sale needs a manager (held in discPending until approved).
 function applyDiscount(amt){
   amt=Math.max(0, Math.min(Math.round(amt)||0, subT()));
@@ -941,6 +960,8 @@ function payPanel(){
           <button class="bigbtn" data-pay="paid">${stkIcon} She has paid</button>
           <button class="bigbtn ghost" data-pay="send">Send the request again</button>
           <button class="bigbtn ghost" data-pay="match">She paid the till, match her code</button>
+          ${matchOpen?`<div class="fld" style="margin:2px 0 0;text-align:left"><label>Her M-PESA confirmation code</label><input id="mcode" placeholder="e.g. TFA1B2C3D4" autocapitalize="characters" style="text-transform:uppercase;font-family:ui-monospace,'Courier New',monospace;letter-spacing:1px" value="${mpesaCode}"></div>
+          <button class="bigbtn" data-pay="confirmcode">${stkIcon} Confirm this code and finish</button>`:''}
           <button class="bigbtn ghost" data-pay="park">Park this sale, serve the next customer</button>
         </div>
         <div class="tip" style="margin-top:14px;text-align:left"><div class="ic">${infoIcon}</div><p>No need to wait at the till. Park it and it moves to your parked sales; open it again when her payment comes through.</p></div></div>`;
@@ -990,7 +1011,7 @@ function checkout(){
            <div class="paid-amt num">KSh ${money(paidChange)}</div>
            <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
         : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
-           <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}</div>`}
+           <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}${paidRef?` · code ${paidRef}`:''}</div>`}
       <div class="paid-card">
         <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v17H6z"/><path d="M9 8h6M9 12h6"/></svg><span>Receipt printed</span><span class="pill ok" style="margin-left:auto">Done</span></div>
         <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg><span>Sent to her on WhatsApp</span><span class="pill ok" style="margin-left:auto">Done</span></div>
@@ -1528,31 +1549,19 @@ screen.addEventListener('click',async e=>{
   const pay=e.target.closest('[data-pay]');
   if(pay){ const a=pay.dataset.pay;
     if(a==='back'){ view='sell'; render(); }
-    else if(a==='send'||a==='match'){ payStage='waiting'; render(); startStkCountdown(120); }
+    else if(a==='send'){ payStage='waiting'; matchOpen=false; render(); startStkCountdown(120); }
+    else if(a==='match'){ matchOpen=!matchOpen; render(); if(matchOpen){ const el=document.getElementById('mcode'); if(el) el.focus(); } }
+    else if(a==='confirmcode'){ const el=document.getElementById('mcode'); const code=(el?el.value:'').trim().toUpperCase(); if(code.length<6){ toast('Enter her full M-PESA code (about 10 characters)',true); return; } mpesaCode=code; await finishSale(); }
     else if(a==='park'){
       if(CART.length){ try{ const r=await api('/api/held','POST',{type:'await',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Awaiting M-PESA'}); HELD.unshift(r.held); }catch(err){ toast('Could not park the sale',true); } }
       CART=[]; resetPay(); view='sell'; toast('Parked. Serving the next customer.'); render();
     }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
-    else if(a==='paid'){
-      paidAmount=dueT();
-      paidTendered = payMethod==='cash' ? cashGiven : dueT();
-      paidChange = payMethod==='cash' ? Math.max(0, cashGiven-dueT()) : 0;
-      try{
-        const r=await api('/api/sales','POST',{
-          lines:CART.map(l=>({id:l.id,n:l.n,a:l.a,q:l.q,p:l.p})),
-          method:payMethod, discountPct:0, discountAmount:saleDiscount, total:dueT(),
-          customer:saleCustomer?saleCustomer.name:'Walk-in', cashier:currentUser?currentUser.name:'',
-          splitParts:payMethod==='split'?splitParts:null, channel:'counter'
-        });
-        PRODUCTS=r.products; TXNS.unshift(r.sale);
-      }catch(err){ toast('Paid on screen, but the sale did not reach the server',true); }
-      payStage='done'; render();
-    }
+    else if(a==='paid'){ await finishSale(); }
     else if(a==='newsale'){ CART=[]; resetPay(); view='sell'; render(); }
     return;
   }
-  const pm=e.target.closest('[data-pm]'); if(pm){ payMethod=pm.dataset.pm; payStage='choose'; cashGiven=0; splitParts=[]; render(); return; }
+  const pm=e.target.closest('[data-pm]'); if(pm){ payMethod=pm.dataset.pm; payStage='choose'; cashGiven=0; splitParts=[]; matchOpen=false; mpesaCode=''; clearInterval(stkTimer); render(); return; }
   const cash=e.target.closest('[data-cash]'); if(cash){ cashGiven=+cash.dataset.cash; render(); return; }
   const sp=e.target.closest('[data-split]'); if(sp){ const remain=Math.max(0,subT()-splitParts.reduce((t,x)=>t+x.amt,0)); splitParts.push(sp.dataset.split==='mpesa'?{label:'M-PESA',amt:Math.min(remain,5000)}:{label:'Cash',amt:remain}); render(); return; }
 
