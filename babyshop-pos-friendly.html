@@ -441,6 +441,13 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .rcpt{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px;font-family:ui-monospace,"Courier New",monospace;font-size:12px;line-height:1.7;color:#2a2a2a;max-height:56vh;overflow:auto}
 .rcpt .c{text-align:center}
 .rcpt .hr{border-top:1px dashed #bbb;margin:8px 0}
+.lbl{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:38mm;min-height:26mm;box-sizing:border-box;padding:1.5mm;background:#fff;border:1px dashed #c9c0b6;border-radius:4px;text-align:center;color:#111;font-family:Nunito,Arial,sans-serif}
+.lbl .lb-shop{font-size:8px;font-weight:800;letter-spacing:.3px}
+.lbl .lb-name{font-size:8.5px;font-weight:700;line-height:1.1;max-height:2.3em;overflow:hidden}
+.lbl .lb-price{font-size:13px;font-weight:900;margin:1px 0}
+.lbl .lb-bc{line-height:0}
+.lbl .lb-bc svg{max-width:34mm;height:auto}
+.lbl .lb-code{font-size:7px;letter-spacing:.4px;margin-top:1px}
 .rcpt .row{display:flex;justify-content:space-between;gap:8px}
 
 /* ---------------- products, reports ---------------- */
@@ -1118,7 +1125,7 @@ function productsPanel(){
         <div class="ir-right">
           <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin${pr.w?` · wholesale ${money(pr.w)}`:''}</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
           <span class="pill ${pr.s<5?'warn':'ok'}">${pr.s} in stock</span>
-          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button></div>`:''}
+          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button><button class="btn ghost sm" data-prodlabel="${pr.id}" style="padding:5px 4px;font-size:12px">Print labels</button></div>`:''}
         </div>
       </div>`).join('')}
     </div>
@@ -1397,8 +1404,29 @@ function receiptHTML(){ const t=TXNS[0]; if(!t) return '<div style="padding:30px
     ${scallop('bottom')}
   </div>`;
 }
-function labelHTML(){ const p=PRODUCTS[0];
-  return `<div class="rcpt" style="max-width:210px;margin:0 auto"><div class="c" style="font-weight:bold">${SHOP.name}</div><div class="c">${p.n}</div><div class="c">${p.a}</div><div class="c" style="font-size:19px;font-weight:bold;margin:6px 0">KSh ${money(p.p)}</div><div class="c" style="letter-spacing:1px;font-size:26px;line-height:1">▏▍▏▎▍▏▊▏▎▍▏▍</div><div class="c">${p.bc}</div></div>`;
+/* ---- real Code128-B barcode (pure JS, scannable, no library) ---- */
+const C128=["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
+function barcodeSVG(text,opt){ text=String(text||'').replace(/[^\x20-\x7e]/g,''); if(!text) text='0';
+  const h=(opt&&opt.height)||44, m=(opt&&opt.module)||1.6, q=10*m;
+  const vals=[104]; for(let i=0;i<text.length;i++) vals.push(text.charCodeAt(i)-32);
+  let sum=104; for(let i=0;i<text.length;i++) sum+=(text.charCodeAt(i)-32)*(i+1);
+  vals.push(sum%103); vals.push(106);
+  let x=q, rects='';
+  for(const v of vals){ const pat=C128[v]||C128[0]; for(let i=0;i<pat.length;i++){ const w=(+pat[i])*m; if(i%2===0) rects+=`<rect x="${x.toFixed(2)}" y="0" width="${w.toFixed(2)}" height="${h}"/>`; x+=w; } }
+  const tot=x+q;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${tot.toFixed(0)}" height="${h}" viewBox="0 0 ${tot.toFixed(0)} ${h}" shape-rendering="crispEdges" fill="#000">${rects}</svg>`;
+}
+/* one price-tag sticker for a product */
+function labelSticker(p){ const code=p.sku||p.bc||''; return `<div class="lbl"><div class="lb-shop">${SHOP.name}</div><div class="lb-name">${p.n}</div><div class="lb-price">KSh ${money(p.p)}</div><div class="lb-bc">${barcodeSVG(code,{height:40,module:1.3})}</div><div class="lb-code">${code}</div></div>`; }
+/* many copies of a product's sticker for a print run */
+function labelSheetHTML(p,copies){ copies=Math.max(1,Math.min(500,copies|0||1)); let s=''; for(let i=0;i<copies;i++) s+=labelSticker(p); return s; }
+/* the "test tag" from the devices screen */
+function labelHTML(){ const p=PRODUCTS[0]; if(!p) return '<div style="padding:20px;text-align:center">Add a product first.</div>'; return `<div style="display:flex;justify-content:center">${labelSticker(p)}</div>`; }
+/* open the print-labels dialog for one product */
+function openLabelFor(id){ const p=PRODUCTS.find(x=>x.id===id)||PRODUCTS[0]; if(!p) return; window.__labelProd=p.id;
+  const m=document.getElementById('hwmodal'); if(!m) return;
+  m.innerHTML=`<div class="rcpt-wrap"><h3 style="margin-bottom:12px">Print labels — ${p.n}</h3><div style="display:flex;justify-content:center;margin-bottom:14px">${labelSticker(p)}</div><div class="field"><label>How many stickers?</label><input id="lblcopies" type="number" min="1" value="${Math.max(1,p.s||1)}" inputmode="numeric" style="width:100%;padding:11px 13px;border:2px solid var(--line2);border-radius:11px;font:inherit;font-weight:700"></div><div style="display:flex;gap:9px;margin-top:16px"><button class="btn green" style="flex:1" data-hw="printlabels">Print</button><button class="btn" data-hw="close">Close</button></div></div>`;
+  window.__hwkind='label'; m.classList.add('show');
 }
 function openPrint(kind){ const m=document.getElementById('hwmodal'); if(!m) return; const inner=kind==='label'?labelHTML():receiptHTML();
   m.innerHTML=`<div class="rcpt-wrap"><h3 style="margin-bottom:12px">${kind==='label'?'Test label':'Test receipt'}</h3>${inner}<div style="display:flex;gap:9px;margin-top:16px"><button class="btn green" style="flex:1" data-hw="print">Print</button><button class="btn" data-hw="close">Close</button></div></div>`;
@@ -1574,6 +1602,7 @@ screen.addEventListener('click',async e=>{
   // stock: change a product's VAT status (standard / exempt)
   const pvat=e.target.closest('[data-prodvat]'); if(pvat){ const id=+pvat.dataset.prodvat; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.vt==='exempt'?'standard':'exempt'; try{ const r=await api('/api/products/'+id,'PATCH',{vat_type:next}); if(r.product){ Object.assign(prod,r.product); } toast(next==='exempt'?'Marked VAT exempt':'Marked standard VAT'); }catch(err){ toast('Could not change VAT status',true); } render(); } return; }
   // stock: put a product on / off the shop website
+  const plab=e.target.closest('[data-prodlabel]'); if(plab){ openLabelFor(+plab.dataset.prodlabel); return; }
   const ponl=e.target.closest('[data-prodonline]'); if(ponl){ const id=+ponl.dataset.prodonline; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.online!==0?0:1; try{ const r=await api('/api/products/'+id,'PATCH',{online:next}); if(r.product){ Object.assign(prod,r.product); } toast(next?'Now on the website':'Taken off the website'); }catch(err){ toast('Could not change website status',true); } render(); } return; }
   // channels: publish the catalogue to the website
   const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
@@ -1634,16 +1663,20 @@ document.getElementById('hwmodal').addEventListener('click',e=>{
   const hw=e.target.closest('[data-hw]');
   if(!hw){ if(e.target.id==='hwmodal') e.target.classList.remove('show'); return; }
   if(hw.dataset.hw==='close'){ document.getElementById('hwmodal').classList.remove('show'); return; }
+  const rcptCss='<style>body{font-family:ui-monospace,Courier New,monospace;margin:0;padding:12px}.rcpt{font-size:12px;line-height:1.7;color:#222}.rcpt .c{text-align:center}.rcpt .hr{border-top:1px dashed #999;margin:8px 0}.rcpt .row{display:flex;justify-content:space-between;gap:8px}</style>';
+  const labelCss='<style>@page{margin:5mm}body{margin:0;font-family:Nunito,Arial,sans-serif}.lbl{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:38mm;min-height:26mm;box-sizing:border-box;padding:1.5mm;margin:1mm;border:1px dashed #ccc;border-radius:3px;page-break-inside:avoid;text-align:center;color:#111}.lb-shop{font-size:8px;font-weight:800}.lb-name{font-size:8.5px;font-weight:700;line-height:1.1;max-height:2.3em;overflow:hidden}.lb-price{font-size:13px;font-weight:900;margin:1px 0}.lb-bc{line-height:0}.lb-bc svg{max-width:34mm;height:auto}.lb-code{font-size:7px;letter-spacing:.4px;margin-top:1px}</style>';
+  const printDoc=(title,css,body)=>{ const w=window.open('','_blank','width=420,height=640'); if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); return; } w.document.write('<!doctype html><html><head><title>'+title+'</title>'+css+'</head><body>'+body+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250)}<'+'/script></body></html>'); w.document.close(); };
   if(hw.dataset.hw==='print'){
     const k=window.__hwkind||'receipt';
-    const w=window.open('','_blank','width=360,height=620');
-    if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); }
-    else{
-      const css='<style>body{font-family:ui-monospace,Courier New,monospace;margin:0;padding:12px}.rcpt{font-size:12px;line-height:1.7;color:#222}.rcpt .c{text-align:center}.rcpt .hr{border-top:1px dashed #999;margin:8px 0}.rcpt .row{display:flex;justify-content:space-between;gap:8px}</style>';
-      w.document.write('<!doctype html><html><head><title>'+k+'</title>'+css+'</head><body>'+(k==='label'?labelHTML():receiptHTML())+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},200)}<'+'/script></body></html>');
-      w.document.close();
-    }
+    if(k==='label') printDoc('label',labelCss,labelHTML()); else printDoc('receipt',rcptCss,receiptHTML());
     document.getElementById('hwmodal').classList.remove('show');
+  }
+  if(hw.dataset.hw==='printlabels'){
+    const p=PRODUCTS.find(x=>x.id===window.__labelProd)||PRODUCTS[0]; if(!p){ toast('No product selected',true); return; }
+    const n=Math.max(1,Math.min(500,parseInt((document.getElementById('lblcopies')||{}).value,10)||1));
+    printDoc('labels',labelCss,labelSheetHTML(p,n));
+    document.getElementById('hwmodal').classList.remove('show');
+    toast('Sent '+n+' label'+(n>1?'s':'')+' to print');
   }
 });
 // barcode scanner: keyboard wedge, and Enter inside a search or scan field

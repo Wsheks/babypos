@@ -321,8 +321,8 @@ function buildCatalogue() {
 }
 
 function addProduct(body) {
-  const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;
-  const sku = body.sku || 'ILK-NEW-' + String(count + 1).padStart(3, '0');
+  // a temporary sku; if the caller gave none we replace it with a tidy ILK-##### based on the new id
+  const sku = (body.sku && String(body.sku).trim()) || null;
   const vatType = body.vat_type === 'exempt' ? 'exempt' : 'standard';
   const ages = deriveAges(body.a);
   const kind = (body.kind && String(body.kind).trim()) || deriveKind(body.n);
@@ -337,9 +337,10 @@ function addProduct(body) {
         kind, ages.min, ages.max, JSON.stringify(sizes), JSON.stringify(colours),
         Number(body.was_price) || null, body.image || null,
         body.online === false || body.online === 0 ? 0 : 1, body.featured ? 1 : 0).lastInsertRowid;
-  // give it a barcode in the prototype's style
+  // give it a barcode in the prototype's style, and a tidy auto SKU if none was supplied
   const bc = '629' + String(1041500 + (id * 137)).slice(-7);
-  db.prepare('UPDATE products SET barcode = ? WHERE id = ?').run(bc, id);
+  const finalSku = sku || ('ILK-' + String(id).padStart(5, '0'));
+  db.prepare('UPDATE products SET barcode = ?, sku = ? WHERE id = ?').run(bc, finalSku, id);
   if (Number(body.s) > 0) {
     db.prepare(`INSERT INTO stock_movements (product_id, type, qty, ref, datetime, user) VALUES (?, 'adjust', ?, 'opening', ?, ?)`)
       .run(id, Number(body.s), now(), body.cashier || null);
