@@ -1371,7 +1371,14 @@ function reports(){
   const avg=count?Math.round(total/count):0;
   const grossProfit=shown.reduce((t,x)=>t+(x.profit||0),0);   // sales revenue minus stock cost
   const expTotal=expShown.reduce((t,x)=>t+(x.amount||0),0);
-  const finalProfit=grossProfit-expTotal;
+  // refunds in range: cash paid back, and the profit that gets reversed (item returns to stock, so only the margin is lost)
+  const costOf=name=>{ if(!name) return 0; const n=String(name).trim().toLowerCase(); let p=PRODUCTS.find(x=>x.n.toLowerCase()===n); if(!p){ const b=n.split(',')[0].trim(); p=PRODUCTS.find(x=>x.n.toLowerCase()===b); } return p?(p.c||0):0; };
+  const refundsShown=RETURNS.filter(r=>r.act==='Refunded' && inRange((r.d||'').slice(0,10)));
+  const refundsTotal=refundsShown.reduce((t,r)=>t+(r.v||0),0);
+  const refundMargin=refundsShown.reduce((t,r)=>t+Math.max(0,(r.v||0)-costOf(r.item)),0);
+  const netTakings=total-refundsTotal;
+  const refundedRefs=new Set(refundsShown.map(r=>r.ref).filter(Boolean));
+  const finalProfit=grossProfit-refundMargin-expTotal;
   const pct=v=>total?Math.round(v/total*100):0;
   const cashExpected=3000+byM['Cash'];
   const mpill={'M-PESA':'mpesa','Card':'card','Cash':'cash'};
@@ -1380,15 +1387,16 @@ function reports(){
   <div class="chips" style="margin-bottom:16px">${ranges.map(r=>`<button class="chip ${repRange===r[0]?'on':''}" data-range="${r[0]}">${r[1]}</button>`).join('')}</div>
   <div class="stats">
     <div class="stat"><div class="l">Money taken</div><div class="v num">${money(total)}</div></div>
+    <div class="stat"><div class="l">Refunds paid out</div><div class="v num" style="${refundsTotal?'color:var(--stop)':''}">${refundsTotal?'− ':''}${money(refundsTotal)}</div></div>
+    <div class="stat"><div class="l">Net takings</div><div class="v num">${money(netTakings)}</div></div>
     <div class="stat"><div class="l">Sales</div><div class="v num">${count}</div></div>
-    <div class="stat"><div class="l">Average sale</div><div class="v num">${money(avg)}</div></div>
-    <div class="stat"><div class="l">Items sold</div><div class="v num">${itemsSold}</div></div>
   </div>
   ${can(7)?`<div class="panel" style="padding:18px 20px;margin-bottom:16px">
     <div class="pt" style="padding:0 0 12px"><h3>Profit</h3></div>
     <div class="set-row"><div><div class="t">Profit from sales</div><div class="d">What you sold, minus what the stock cost you</div></div><div class="val num">KSh ${money(grossProfit)}</div></div>
+    ${refundMargin?`<div class="set-row"><div><div class="t">Refunded sales</div><div class="d">Profit reversed on items that were refunded (the stock came back)</div></div><div class="val num" style="color:var(--stop)">− KSh ${money(refundMargin)}</div></div>`:''}
     <div class="set-row"><div><div class="t">Expenses</div><div class="d">Rent, salaries, transport and the rest</div></div><div class="val num" style="color:var(--stop)">− KSh ${money(expTotal)}</div></div>
-    <div class="set-row" style="border-top:2px solid var(--line2)"><div><div class="t" style="font-size:16px">Final profit</div><div class="d">After expenses are taken off</div></div><div class="val num baloo" style="font-size:21px;color:${finalProfit>=0?'var(--mpesa)':'var(--stop)'}">KSh ${money(finalProfit)}</div></div>
+    <div class="set-row" style="border-top:2px solid var(--line2)"><div><div class="t" style="font-size:16px">Final profit</div><div class="d">After refunds and expenses are taken off</div></div><div class="val num baloo" style="font-size:21px;color:${finalProfit>=0?'var(--mpesa)':'var(--stop)'}">KSh ${money(finalProfit)}</div></div>
   </div>`:''}
   <div class="panel" style="padding:18px 20px">
     <div class="pt" style="padding:0 0 12px"><h3>Money by method</h3></div>
@@ -1410,7 +1418,7 @@ function reports(){
       ${shown.map((x,i)=>{ if(repMethod&&x.method!==repMethod) return ''; return `<div class="txn ${openTxn===i?'open':''}">
         <div class="txn-head" data-txn="${i}">
           <div class="txn-time num">${x.t}</div>
-          <div class="txn-main"><div class="txn-ref">Sale ${x.ref} · ${x.cust}</div><div class="txn-sub">${x.items.reduce((a,it)=>a+it[1],0)} items · ${x.cashier}</div></div>
+          <div class="txn-main"><div class="txn-ref">Sale ${x.ref} · ${x.cust}${refundedRefs.has(x.ref)?' <span class="pill warn" style="margin-left:4px">Refunded</span>':''}</div><div class="txn-sub">${x.items.reduce((a,it)=>a+it[1],0)} items · ${x.cashier}</div></div>
           <span class="pill ${mpill[x.method]}">${x.method}</span>
           <div class="txn-amt num">KSh ${money(x.amt)}</div>
           <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
