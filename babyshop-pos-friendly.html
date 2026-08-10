@@ -994,7 +994,7 @@ function payPanel(){
         ${quickTenders(total).map((amt,i)=>`<button data-cash="${amt}">${i===0?`Exact, ${money(amt)}`:money(amt)}</button>`).join('')}
       </div>
       <div class="changebox" style="background:${enough?'var(--mpesa-t)':'#f6efe3'}"><span>Change to give her</span><b class="num baloo" style="font-size:20px;color:${enough?'var(--mpesa)':'var(--mut)'}">KSh ${money(change)}</b></div>
-      <button class="bigbtn sun" style="margin-top:16px" data-pay="paid" ${enough?'':'disabled'}>${stkIcon} Done, print the receipt</button>`;
+      <button class="bigbtn sun" style="margin-top:16px" data-pay="paid" ${enough?'':'disabled'}>${stkIcon} Done, take the cash</button>`;
   }
   const paid=splitParts.reduce((t,x)=>t+x.amt,0), remain=Math.max(0,total-paid);
   return `<div style="color:var(--ink2);font-weight:700;margin-bottom:12px">Take it in parts. The balance drops as each one goes through.</div>
@@ -1002,7 +1002,7 @@ function payPanel(){
     <div style="display:flex;justify-content:space-between;margin:14px 0;font-weight:800"><span>Still to pay</span><b class="num baloo" style="font-size:22px;color:${remain?'var(--coral)':'var(--mpesa)'}">KSh ${money(remain)}</b></div>
     ${remain>0
       ? `<div style="display:grid;gap:9px"><button class="bigbtn ghost" data-split="mpesa">Add M-PESA, ${money(Math.min(remain,5000))}</button><button class="bigbtn ghost" data-split="cash">Add cash, the rest (${money(remain)})</button></div>`
-      : `<button class="bigbtn" data-pay="paid">${stkIcon} Fully paid, print the receipt</button>`}`;
+      : `<button class="bigbtn" data-pay="paid">${stkIcon} Fully paid, finish</button>`}`;
 }
 
 function checkout(){
@@ -1018,12 +1018,14 @@ function checkout(){
            <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
         : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
            <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}${paidRef?` · code ${paidRef}`:''}</div>`}
-      <div class="paid-card">
-        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v17H6z"/><path d="M9 8h6M9 12h6"/></svg><span>Receipt printed</span><span class="pill ok" style="margin-left:auto">Done</span></div>
-        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg><span>Sent to her on WhatsApp</span><span class="pill ok" style="margin-left:auto">Done</span></div>
-        <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/></svg><span>Logged as an eTIMS tax receipt</span><span class="pill ok" style="margin-left:auto">Done</span></div>
+      <div style="max-width:340px;margin:20px auto 0">
+        <div style="font-size:12px;color:var(--mut);font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">Receipt preview</div>
+        ${TXNS[0]?receiptHTML(TXNS[0]):'<div style="color:var(--mut);font-weight:600">No receipt to show.</div>'}
       </div>
-      <button class="bigbtn" data-pay="newsale">Start a new sale</button>
+      <div style="display:grid;gap:10px;max-width:340px;margin:18px auto 0">
+        <button class="bigbtn" data-pay="printreceipt"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg> Print receipt for her</button>
+        <button class="bigbtn ghost" data-pay="newsale">No receipt, start a new sale</button>
+      </div>
     </div>`;
   }
   const methods=[
@@ -1724,6 +1726,7 @@ screen.addEventListener('click',async e=>{
     }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
     else if(a==='paid'){ await finishSale(); }
+    else if(a==='printreceipt'){ printHTML('Receipt '+((TXNS[0]||{}).ref||''), thermalReceiptHTML(TXNS[0]), receiptPrintCss()); }
     else if(a==='newsale'){ CART=[]; resetPay(); view='sell'; render(); }
     return;
   }
