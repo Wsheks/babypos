@@ -1699,8 +1699,11 @@ function render(){
   document.getElementById('greet').textContent = 'Karibu, '+currentUser.name.split(' ')[0];
   document.getElementById('subtitle').textContent = t[1] || (SHOP.name+', '+SHOP.branch);
 }
-document.querySelector('.rail').addEventListener('click',e=>{
-  const b=e.target.closest('.navbtn'); if(b){view=b.dataset.nav; render();}
+document.querySelector('.rail').addEventListener('click',async e=>{
+  const b=e.target.closest('.navbtn'); if(b){ view=b.dataset.nav; render();
+    // pull fresh data so stock, sales and returns are current even if another device changed them
+    if(['sell','stock','reports','returns','expenses'].includes(view)){ await refreshData(); render(); }
+  }
 });
 screen.addEventListener('click',async e=>{
   // open the payment step from the sale
@@ -1959,6 +1962,14 @@ document.getElementById('helpClose').addEventListener('click',closeHelp);
 bg.addEventListener('click',closeHelp);
 
 // Load the shop's data from the backend, then show the till.
+// Re-pull the shop data from the server (keeps the in-memory cart untouched).
+async function refreshData(){
+  try{
+    const d=await api('/api/bootstrap');
+    if(d.shop){ SETTINGS=d.shop; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
+    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY;
+  }catch(e){}
+}
 async function boot(){
   // A reset link (?reset=token) opens the "set a new password" screen.
   try{ const rt=new URL(location.href).searchParams.get('reset'); if(rt) resetToken=rt; }catch(e){}
