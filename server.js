@@ -700,7 +700,13 @@ const server = http.createServer(async (req, res) => {
     // ---- static: the prototype HTML ----
     if ((p === '/' || p === '/index.html' || p === '/babyshop-pos-friendly.html') && method === 'GET') {
       const html = fs.readFileSync(HTML_FILE);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      // Never cache the page, so every load runs the latest version after a deploy (no hard-refresh needed).
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       return res.end(html);
     }
 
