@@ -1151,7 +1151,7 @@ function productsPanel(){
   </div>` : '';
   const shownProds=PRODUCTS.filter(p=>stockFilter==='low'?p.s<5:true);
   return `<div class="stats">
-    <button class="stat stat-btn ${stockFilter===null?'':''}" data-stockfilter="all"><div class="l">Products</div><div class="v num">${PRODUCTS.length}</div></button>
+    <button class="stat stat-btn ${stockFilter===null?'':''}" data-stockfilter="all"><div class="l">Different products</div><div class="v num">${PRODUCTS.length}</div></button>
     <button class="stat stat-btn" data-stockfilter="all"><div class="l">Pieces in stock</div><div class="v num">${units}</div></button>
     <button class="stat stat-btn ${stockFilter==='low'?'on':''}" data-stockfilter="low"><div class="l">Running low</div><div class="v num">${low}</div></button>
     ${can(7)?`<button class="stat stat-btn" data-stockfilter="all"><div class="l">Stock value, at cost</div><div class="v num">${money(costVal)}</div></button>`:`<button class="stat stat-btn" data-stockfilter="all"><div class="l">Stock value</div><div class="v num">${money(retail)}</div></button>`}
