@@ -184,12 +184,14 @@ function allOrders() {
 }
 function allReturns() {
   return db.prepare('SELECT * FROM returns ORDER BY id DESC').all().map(r =>
-    ({ id: r.id, c: r.customer, item: r.item, why: r.reason, d: r.at, act: r.action, st: r.status, v: r.value }));
+    ({ id: r.id, c: r.customer, item: r.item, why: r.reason, d: r.at, act: r.action, st: r.status, v: r.value, ref: r.sale_ref || null }));
 }
 // Put a returned item back on the shelf (best-effort match by product name).
 function restockByName(name, user) {
   if (!name) return;
-  const prod = db.prepare('SELECT * FROM products WHERE name = ? COLLATE NOCASE').get(String(name).trim());
+  const n = String(name).trim();
+  let prod = db.prepare('SELECT * FROM products WHERE name = ? COLLATE NOCASE').get(n);
+  if (!prod) { const base = n.split(',')[0].trim(); if (base && base !== n) prod = db.prepare('SELECT * FROM products WHERE name = ? COLLATE NOCASE').get(base); }
   if (!prod) return;
   db.prepare('UPDATE products SET stock_qty = stock_qty + 1 WHERE id = ?').run(prod.id);
   db.prepare(`INSERT INTO stock_movements (product_id, type, qty, ref, datetime, user) VALUES (?, 'return', 1, 'return to stock', ?, ?)`).run(prod.id, now(), user || null);
@@ -201,8 +203,8 @@ function addReturn(body) {
   const action = type === 'swap' ? 'Swapped' : (status === 'done' ? 'Refunded' : 'Refund pending');
   const value = type === 'refund' ? Math.max(0, Math.round(Number(body.value) || 0)) : 0;
   db.prepare(
-    `INSERT INTO returns (customer, item, reason, at, action, status, value) VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(body.customer || 'Walk-in', body.item || '', body.reason || '', localStamp(), action, status, value);
+    `INSERT INTO returns (customer, item, reason, at, action, status, value, sale_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(body.customer || 'Walk-in', body.item || '', body.reason || '', localStamp(), action, status, value, body.saleRef || null);
   // Refund = item back on the shelf, nothing taken → restock. Swap = even exchange → stock neutral.
   if (status === 'done' && type === 'refund') restockByName(body.item, body.cashier);
   return allReturns();
