@@ -183,8 +183,41 @@ function allOrders() {
   return db.prepare("SELECT * FROM orders WHERE channel != 'tt' ORDER BY id").all().map(orderOut);
 }
 function allReturns() {
-  return db.prepare('SELECT * FROM returns ORDER BY id').all().map(r =>
-    ({ c: r.customer, item: r.item, why: r.reason, d: r.at, act: r.action, st: r.status, v: r.value }));
+  return db.prepare('SELECT * FROM returns ORDER BY id DESC').all().map(r =>
+    ({ id: r.id, c: r.customer, item: r.item, why: r.reason, d: r.at, act: r.action, st: r.status, v: r.value }));
+}
+// Put a returned item back on the shelf (best-effort match by product name).
+function restockByName(name, user) {
+  if (!name) return;
+  const prod = db.prepare('SELECT * FROM products WHERE name = ? COLLATE NOCASE').get(String(name).trim());
+  if (!prod) return;
+  db.prepare('UPDATE products SET stock_qty = stock_qty + 1 WHERE id = ?').run(prod.id);
+  db.prepare(`INSERT INTO stock_movements (product_id, type, qty, ref, datetime, user) VALUES (?, 'return', 1, 'return to stock', ?, ?)`).run(prod.id, now(), user || null);
+}
+function addReturn(body) {
+  const type = body.type === 'refund' ? 'refund' : 'swap';
+  // swaps complete on the spot; refunds need a manager, so unapproved ones wait.
+  const status = type === 'swap' ? 'done' : (body.approved ? 'done' : 'wait');
+  const action = type === 'swap' ? 'Swapped' : (status === 'done' ? 'Refunded' : 'Refund pending');
+  const value = type === 'refund' ? Math.max(0, Math.round(Number(body.value) || 0)) : 0;
+  db.prepare(
+    `INSERT INTO returns (customer, item, reason, at, action, status, value) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(body.customer || 'Walk-in', body.item || '', body.reason || '', localStamp(), action, status, value);
+  // Refund = item back on the shelf, nothing taken → restock. Swap = even exchange → stock neutral.
+  if (status === 'done' && type === 'refund') restockByName(body.item, body.cashier);
+  return allReturns();
+}
+function decideReturn(id, body) {
+  const r = db.prepare('SELECT * FROM returns WHERE id = ?').get(id);
+  if (!r) return allReturns();
+  if (body.action === 'swap') {
+    db.prepare("UPDATE returns SET status='done', action='Swapped', value=0 WHERE id=?").run(id);
+    // swap = even exchange, stock neutral
+  } else {
+    db.prepare("UPDATE returns SET status='done', action='Refunded' WHERE id=?").run(id);
+    restockByName(r.item, body.cashier);  // refunded item back on the shelf
+  }
+  return allReturns();
 }
 function pendingDelivery() {
   const d = db.prepare("SELECT * FROM deliveries WHERE status = 'pending' ORDER BY id LIMIT 1").get();
@@ -429,6 +462,17 @@ const server = http.createServer(async (req, res) => {
         delivery: del.delivery,
         expenses: allExpenses(),
       });
+    }
+
+    // Returns and swaps.
+    if (p === '/api/returns' && method === 'POST') {
+      const body = await readBody(req);
+      return sendJSON(res, 200, { returns: addReturn(body), products: allProducts() });
+    }
+    const retDecide = p.match(/^\/api\/returns\/(\d+)$/);
+    if (retDecide && method === 'PATCH') {
+      const body = await readBody(req);
+      return sendJSON(res, 200, { returns: decideReturn(Number(retDecide[1]), body), products: allProducts() });
     }
 
     // Expenses (shop running costs). Recording gated on the client to owner/manager.

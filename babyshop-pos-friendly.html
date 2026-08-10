@@ -647,7 +647,7 @@ let INTAKE = [];     // pending delivery lines, loaded in boot()
 let DELIVERY = null; // pending delivery header, loaded in boot()
 let RETURNS = [];    // loaded in boot()
 let TXNS = [];       // today's sales, loaded in boot()
-let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1, editPrice=null;
+let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1, editPrice=null, newReturnOpen=false;
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
 const ROLES = [
@@ -1194,16 +1194,37 @@ function stock(){
 
 /* -------- RETURNS -------- */
 function returns(){
+  const nowD=new Date(), ym=nowD.getFullYear()+'-'+String(nowD.getMonth()+1).padStart(2,'0');
+  const monthN=RETURNS.filter(r=>(r.d||'').slice(0,7)===ym).length;
+  const swapped=RETURNS.filter(r=>r.act==='Swapped').length;
+  const refunded=RETURNS.filter(r=>r.act==='Refunded').length;
+  const needYou=RETURNS.filter(r=>r.st==='wait').length;
+  const reasons={}; RETURNS.forEach(r=>{ if(r.why) reasons[r.why]=(reasons[r.why]||0)+1; });
+  const topReason=Object.entries(reasons).sort((a,b)=>b[1]-a[1])[0];
+  const REASONS=['Wrong size','Changed her mind','Faulty item','Wrong item given','Other'];
   return `<div class="phead"><h2>Returns and swaps</h2><p>Most returns here are just a size. We swap first, and only refund when there is nothing to swap into. Within 14 days with a receipt.</p></div>
   <div class="stats">
-    <div class="stat"><div class="l">This month</div><div class="v num">7</div></div>
-    <div class="stat"><div class="l">Swapped</div><div class="v num">5</div></div>
-    <div class="stat"><div class="l">Refunded</div><div class="v num">2</div></div>
-    <div class="stat"><div class="l">Most common reason</div><div class="v sm">Wrong size bought</div></div>
+    <div class="stat"><div class="l">This month</div><div class="v num">${monthN}</div></div>
+    <div class="stat"><div class="l">Swapped</div><div class="v num">${swapped}</div></div>
+    <div class="stat"><div class="l">Refunded</div><div class="v num">${refunded}</div></div>
+    <div class="stat"><div class="l">Most common reason</div><div class="v sm">${topReason?topReason[0]:'None yet'}</div></div>
   </div>
   <div class="panel">
-    <div class="pt"><h3>Recent returns</h3><span class="badge">2 need you</span></div>
+    <div class="pt"><h3>Recent returns</h3><span class="badge">${needYou?needYou+' need you':RETURNS.length+' total'}</span><button class="btn green sm" data-newreturn style="margin-left:auto">${newReturnOpen?'Close':'Record a return'}</button></div>
+    ${newReturnOpen?`<div style="padding:14px 18px;border-bottom:1px solid var(--line2);background:var(--paper)">
+      <datalist id="prodnames">${PRODUCTS.slice(0,400).map(p=>`<option value="${p.n}">`).join('')}</datalist>
+      <div class="np-grid">
+        <div class="fld"><label>Customer (optional)</label><input id="ret-cust" placeholder="Walk-in"></div>
+        <div class="fld"><label>Item returned</label><input id="ret-item" list="prodnames" placeholder="Start typing the product"></div>
+        <div class="fld"><label>Reason</label><select id="ret-reason" class="sel" style="padding:12px 14px;width:100%">${REASONS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+        <div class="fld"><label>What happens</label><select id="ret-type" class="sel" style="padding:12px 14px;width:100%"><option value="swap">Swap for another item</option><option value="refund">Refund the money</option></select></div>
+        <div class="fld"><label>Refund amount (KSh, refunds only)</label><input id="ret-amt" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div style="font-size:12px;color:var(--mut);font-weight:600;margin:4px 2px 10px">A swap goes through on the spot. A refund needs a manager${can(6)?' (you can approve it)':', so it will wait for one'}. The returned item goes back into stock.</div>
+      <button class="bigbtn" data-savereturn style="max-width:260px">Save this return</button>
+    </div>`:''}
     <div class="list">
+      ${RETURNS.length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">No returns yet. Use "Record a return" when a customer brings something back.</div>`:''}
       ${RETURNS.map(r=>`<div class="item-row">
         <div class="thumb" style="background:${r.st==='done'?'#eaf6ef':'#fdefd7'};color:${r.st==='done'?'var(--ok)':'var(--sun-d)'}">
           ${r.st==='done'
@@ -1211,14 +1232,13 @@ function returns(){
             :'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 010 10H9"/></svg>'}
         </div>
         <div>
-          <div class="ir-nm">${r.c}</div>
-          <div class="ir-sub">${r.item}</div>
-          <div class="ir-sub" style="color:var(--mut)">${r.why} · ${r.d}</div>
+          <div class="ir-nm">${r.c||'Walk-in'}</div>
+          <div class="ir-sub">${r.item||'—'}${r.v?` · KSh ${money(r.v)}`:''}</div>
+          <div class="ir-sub" style="color:var(--mut)">${r.why||''} · ${r.d||''}</div>
         </div>
         <div class="ir-right">
-          ${r.st==='done'?'<span class="pill ok">'+r.act+'</span>'
-            :r.st==='wait'?'<span class="pill warn">Needs a manager</span><div style="display:flex;gap:8px"><button class="btn green sm">Approve refund</button><button class="btn sm">Swap instead</button></div>'
-            :'<span class="pill info">Swap</span><button class="btn sun sm">Find her size</button>'}
+          ${r.st==='done'?'<span class="pill ok">'+(r.act||'Done')+'</span>'
+            :`<span class="pill warn">Needs a manager</span>${can(6)?`<div style="display:flex;gap:8px"><button class="btn green sm" data-retapprove="${r.id}">Approve refund</button><button class="btn sm" data-retswap="${r.id}">Swap instead</button></div>`:'<span class="ir-sub" style="color:var(--mut)">Ask a manager</span>'}`}
         </div>
       </div>`).join('')}
     </div>
@@ -1723,6 +1743,22 @@ screen.addEventListener('click',async e=>{
     render(); return;
   }
   const expd=e.target.closest('[data-expdel]'); if(expd){ const item=EXPENSES[+expd.dataset.expdel]; if(item && confirm('Remove this expense?')){ try{ await api('/api/expenses/'+item.id,'DELETE'); EXPENSES=EXPENSES.filter(x=>x!==item); toast('Expense removed'); }catch(err){ toast('Could not remove it',true); } render(); } return; }
+
+  // returns: record / approve / swap
+  const nr=e.target.closest('[data-newreturn]'); if(nr){ newReturnOpen=!newReturnOpen; render(); return; }
+  const svr=e.target.closest('[data-savereturn]'); if(svr){
+    const g=id=>document.getElementById(id);
+    const item=(g('ret-item').value||'').trim();
+    if(!item){ toast('Which item was returned?',true); g('ret-item').focus(); return; }
+    const type=g('ret-type').value, reason=g('ret-reason').value;
+    const value=type==='refund'?(parseInt((g('ret-amt').value||'').replace(/\D/g,''))||0):0;
+    if(type==='refund'&&value<=0){ toast('Enter the refund amount',true); g('ret-amt').focus(); return; }
+    try{ const r=await api('/api/returns','POST',{customer:(g('ret-cust').value||'').trim()||'Walk-in',item,reason,type,value,approved:type==='refund'?can(6):false,cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; newReturnOpen=false; toast(type==='swap'?'Swap recorded':(can(6)?'Refund recorded':'Refund saved, waiting for a manager')); }
+    catch(err){ toast('Could not save the return',true); }
+    render(); return;
+  }
+  const rap=e.target.closest('[data-retapprove]'); if(rap){ try{ const r=await api('/api/returns/'+rap.dataset.retapprove,'PATCH',{action:'refund',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Refund approved'); }catch(err){ toast('Could not approve',true); } render(); return; }
+  const rsw=e.target.closest('[data-retswap]'); if(rsw){ try{ const r=await api('/api/returns/'+rsw.dataset.retswap,'PATCH',{action:'swap',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Marked as swapped'); }catch(err){ toast('Could not update',true); } render(); return; }
 
   // stock: products / deliveries / add product / accept delivery
   const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
