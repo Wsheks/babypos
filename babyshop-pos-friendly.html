@@ -1463,6 +1463,53 @@ async function connectPrinter(which,method){ const d=DEVICES[which]; try{
 }
 // Open a print window with any HTML body (used for reprints and the Z report).
 function printHTML(title, body, css){ const w=window.open('','_blank','width=430,height=650'); if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); return; } w.document.write('<!doctype html><html><head><title>'+title+'</title>'+(css||'')+'</head><body>'+body+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250)}<'+'/script></body></html>'); w.document.close(); }
+
+/* ---- printer calibration (from Settings) ---- */
+const sv=(key,def)=>{ const v=SETTINGS[key]; return (v!==undefined&&v!=='')?v:def; };
+function receiptWmm(){ return Number(sv('receipt_width','80'))||80; }
+function receiptPx(){ const s=sv('receipt_text','normal'); return s==='large'?14:s==='small'?11:12.5; }
+function labelDims(){ const s=sv('label_size','40 x 30 mm'); if(/58/.test(s)) return {w:58,h:40}; const m=s.match(/(\d+)\s*x\s*(\d+)/); return m?{w:+m[1],h:+m[2]}:{w:40,h:30}; }
+// Print CSS for an 80mm / 58mm thermal receipt: full paper width, pure black, monospace.
+function receiptPrintCss(){ const W=receiptWmm(), px=receiptPx();
+  return `<style>@page{size:${W}mm auto;margin:0}
+    body{margin:0;padding:3mm 2mm;width:${W-4}mm;color:#000;background:#fff;font-family:ui-monospace,'Courier New',monospace;font-size:${px}px;font-weight:700;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .tc{text-align:center}.tb{font-weight:800}.big{font-size:${px+7}px;font-weight:800}
+    .hr{border:0;border-top:1px dashed #000;margin:6px 0}
+    .rw{display:flex;justify-content:space-between;gap:6px}
+    .rw .r{ text-align:right;white-space:nowrap}
+    .it{margin:2px 0}.sub{font-size:${px-1.5}px}
+  </style>`;
+}
+function labelPrintCss(){ const {w,h}=labelDims();
+  return `<style>@page{size:${w}mm ${h}mm;margin:0}
+    body{margin:0;color:#000;background:#fff;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .lbl{width:${w}mm;height:${h}mm;box-sizing:border-box;padding:1mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;page-break-after:always}
+    .lb-shop{font-size:8px;font-weight:800}.lb-name{font-size:8.5px;font-weight:700;line-height:1.05;max-height:2.2em;overflow:hidden}
+    .lb-price{font-size:13px;font-weight:900;margin:1px 0}.lb-bc{line-height:0}.lb-bc svg{max-width:${w-4}mm;height:auto}.lb-code{font-size:7px;letter-spacing:.4px}
+  </style>`;
+}
+// A plain, full-width, pure-black receipt built for a thermal printer.
+function thermalReceiptHTML(t){ t=t||TXNS[0]; if(!t) return '<div class="tc">No sale to print.</div>';
+  const dateStr=new Date().toLocaleString('en-GB');
+  const itemsHtml=t.items.map(it=>`<div class="it"><div class="rw"><span>${it[1]} x ${it[0]}</span><span class="r">${money(it[1]*it[2])}</span></div></div>`).join('');
+  const vatLine=(t.vat>0)?`<div class="rw sub"><span>Incl VAT</span><span class="r">KSh ${money(t.vat)}</span></div>`:'';
+  return `<div class="tc tb">${SHOP.name}</div>
+    <div class="tc sub">${SHOP.branch}, Nairobi</div>
+    <div class="tc sub">Till ${SHOP.till}${SHOP.pin?' · PIN '+SHOP.pin:''}</div>
+    <hr class="hr">
+    <div class="rw sub"><span>Receipt</span><span class="r">${t.ref||'-'}</span></div>
+    <div class="rw sub"><span>Date</span><span class="r">${dateStr}</span></div>
+    <div class="rw sub"><span>Served by</span><span class="r">${t.cashier||'-'}</span></div>
+    <div class="rw sub"><span>Customer</span><span class="r">${t.cust||'Walk-in'}</span></div>
+    <hr class="hr">
+    ${itemsHtml}
+    <hr class="hr">
+    <div class="rw big"><span>TOTAL</span><span class="r">KSh ${money(t.amt)}</span></div>
+    <div class="rw sub"><span>Paid by</span><span class="r">${t.method}${t.mpesaRef?' '+t.mpesaRef:''}</span></div>
+    ${vatLine}
+    <hr class="hr">
+    <div class="tc sub">Thank you, karibu tena!</div>`;
+}
 // End-of-day Z report for the range currently selected in Reports.
 function zReportHTML(){
   const ymd=dt=>{const z=new Date(dt);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0');};
@@ -1476,7 +1523,7 @@ function zReportHTML(){
   const profit=shown.reduce((t,x)=>t+(x.profit||0),0), expTotal=exp.reduce((t,x)=>t+(x.amount||0),0);
   const cashExpected=3000+byM['Cash'];
   const row=(l,v,strong)=>`<div style="display:flex;justify-content:space-between;padding:4px 0;${strong?'font-weight:800;border-top:1px solid #000;margin-top:4px;padding-top:7px':''}"><span>${l}</span><span>${v}</span></div>`;
-  return `<div style="width:300px;max-width:100%;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;color:#111;font-size:13px">
+  return `<div style="width:100%;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;color:#000;font-size:13px;font-weight:700">
     <div style="text-align:center;font-weight:800;font-size:15px">${SHOP.name}</div>
     <div style="text-align:center">${SHOP.branch} · Till ${SHOP.till}</div>
     <div style="text-align:center;margin:6px 0 10px">Z REPORT · ${rlabel}<br>${new Date().toLocaleString('en-GB')}</div>
@@ -1572,15 +1619,16 @@ function devicesBody(){ const c=caps();
   return `<div class="panel"><div class="pt"><h3>What this device supports</h3><span class="badge">Checked live</span></div>
     <div style="padding:16px 18px"><div class="caps">
       ${capItem(c.usb,'USB printers')}${capItem(c.bt,'Bluetooth')}${capItem(c.serial,'Serial')}${capItem(c.camera,'Camera scan')}${capItem(c.api,'Built-in reader')}
-    </div><div style="font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">A browser cannot reach a printer on its own, so you tap Connect and choose the device once, then the till remembers it. A USB barcode scanner needs no setup, it types the code straight into the sale.</div></div>
+    </div><div style="font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">Printing goes through your browser's print box, where <b>you pick which printer</b> to use (a web till cannot list or choose printers by itself). Tip: in Windows, set the receipt printer and the label printer as separate defaults, and each time choose the right one. A USB barcode scanner needs no setup, it types the code straight into the sale.</div></div>
   </div>
   <div class="panel" style="padding:16px 18px"><div class="pt" style="padding:0 0 12px"><h3>Devices</h3></div>
     <div class="devcard"><div class="dh"><div class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg></div>
-      <div style="flex:1"><h4>Receipt printer</h4><div class="dsub">${r.connected?`${r.name} · over ${r.method}${r.demo?' · demo':''}`:'80mm thermal, for the customer receipt'}</div></div>
-      <span class="pill ${r.connected?'ok':'warn'}">${r.connected?'Connected':'Not connected'}</span></div>
-      <div class="drow"><select class="sel" id="rmethod"><option value="usb">USB cable</option><option value="bt">Bluetooth</option><option value="network">Network (IP)</option><option value="serial">Serial</option></select>
-      <button class="btn sun sm" data-dev="receipt-connect">${r.connected?'Reconnect':'Connect'}</button>
-      <button class="btn green sm" data-dev="receipt-test" ${r.connected?'':'disabled style="opacity:.5;pointer-events:none"'}>Test print</button></div>
+      <div style="flex:1"><h4>Receipt printer</h4><div class="dsub">Thermal roll · set the width below, then pick it in the print box</div></div>
+      <span class="pill ok">Ready</span></div>
+      <div class="drow"><select class="sel" data-setval="receipt_width"><option value="80"${sv('receipt_width','80')==='80'?' selected':''}>80mm paper</option><option value="58"${sv('receipt_width','80')==='58'?' selected':''}>58mm paper</option></select>
+      <select class="sel" data-setval="receipt_text"><option value="small"${sv('receipt_text','normal')==='small'?' selected':''}>Small text</option><option value="normal"${sv('receipt_text','normal')==='normal'?' selected':''}>Normal text</option><option value="large"${sv('receipt_text','normal')==='large'?' selected':''}>Large text</option></select>
+      <button class="btn green sm" data-testreceipt>Print a test receipt</button></div>
+      <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:8px">Set this to match your paper roll. In the print box that opens, pick your receipt printer, set paper/size to the roll, and turn margins off. To make faint print darker, raise the density in the printer's own driver settings.</div>
     </div>
     <div class="devcard"><div class="dh"><div class="di" style="background:#e7effc;color:#215bb0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12M8 6v12M12 6v12M16 6v12M20 6v12"/></svg></div>
       <div style="flex:1"><h4>Barcode scanner</h4><div class="dsub">A USB scanner works straight away, it types the code into the sale</div></div>
@@ -1590,11 +1638,11 @@ function devicesBody(){ const c=caps();
       <div style="font-size:12.5px;color:var(--mut);font-weight:600;margin-top:10px">Try a real product code: ${someBc}. On a tablet with no scanner, the camera can read barcodes instead.</div>
     </div>
     <div class="devcard"><div class="dh"><div class="di" style="background:#efe7f7;color:#6c4bb3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M6 8V5h12v3M6 16v3h12v-3"/></svg></div>
-      <div style="flex:1"><h4>Label and price tag printer</h4><div class="dsub">${l.connected?`${l.name} · ${l.size}${l.demo?' · demo':''}`:'Prints price tags with a barcode for new stock'}</div></div>
-      <span class="pill ${l.connected?'ok':'warn'}">${l.connected?'Connected':'Not connected'}</span></div>
-      <div class="drow"><select class="sel" id="lsize"><option>40 x 30 mm</option><option>50 x 30 mm</option><option>58 mm roll</option></select>
-      <button class="btn sun sm" data-dev="label-connect">${l.connected?'Reconnect':'Connect'}</button>
-      <button class="btn green sm" data-dev="label-test" ${l.connected?'':'disabled style="opacity:.5;pointer-events:none"'}>Print a test tag</button></div>
+      <div style="flex:1"><h4>Label and price tag printer</h4><div class="dsub">Sticker roll · set the size below, then pick this printer in the print box</div></div>
+      <span class="pill ok">Ready</span></div>
+      <div class="drow"><select class="sel" data-setval="label_size"><option${sv('label_size','40 x 30 mm')==='40 x 30 mm'?' selected':''}>40 x 30 mm</option><option${sv('label_size','40 x 30 mm')==='50 x 30 mm'?' selected':''}>50 x 30 mm</option><option${sv('label_size','40 x 30 mm')==='58 mm roll'?' selected':''}>58 mm roll</option></select>
+      <button class="btn green sm" data-testlabel>Print a test tag</button></div>
+      <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:8px">Set this to your sticker size. In the print box, choose your <b>label printer</b> (not the receipt printer) and set the paper size to the sticker, with margins off. Labels come from the same print box, so picking the right printer there is what sends them to the sticker roll.</div>
     </div>
   </div>`;
 }
@@ -1741,8 +1789,10 @@ screen.addEventListener('click',async e=>{
   // settings and generic controls
   const set=e.target.closest('[data-set]'); if(set){setTab=set.dataset.set; render(); return;}
   // settings: save the VAT rate to the server
-  const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), '<style>@page{margin:8mm}body{margin:0;background:#fff}</style>'); toast('Z report ready to print'); return; }
-  const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), receiptHTML(t), '<style>@page{margin:6mm}body{margin:0;background:#fff}</style>'); return; }
+  const trc=e.target.closest('[data-testreceipt]'); if(trc){ const sample=TXNS[0]||{t:new Date().toTimeString().slice(0,5),ref:'TEST',cust:'Walk-in',method:'Cash',amt:1500,vat:0,cashier:currentUser?currentUser.name:'',items:[['Sample item',1,1500],['Another item',2,500]]}; printHTML('Test receipt', thermalReceiptHTML(sample), receiptPrintCss()); return; }
+  const tlb=e.target.closest('[data-testlabel]'); if(tlb){ const p=PRODUCTS[0]; if(!p){ toast('Add a product first',true); return; } printHTML('Test label', labelSheetHTML(p,1), labelPrintCss()); return; }
+  const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), receiptPrintCss()); toast('Z report ready to print'); return; }
+  const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), thermalReceiptHTML(t), receiptPrintCss()); return; }
   const sret=e.target.closest('[data-startreturn]'); if(sret){ view='returns'; render(); return; }
   const scst=e.target.closest('[data-setcust]'); if(scst){ const nm=prompt('Customer name for the receipt', saleCustomer?saleCustomer.name:''); if(nm!==null){ const n=nm.trim(); saleCustomer = n ? {name:n, detail:'Added at the till'} : null; render(); } return; }
   const svat=e.target.closest('[data-savevat]'); if(svat){ const el=document.getElementById('vatInput'); let v=parseInt((el&&el.value||'').replace(/\D/g,'')); if(!Number.isFinite(v)||v<0||v>100){ toast('VAT rate must be a whole number from 0 to 100',true); if(el)el.focus(); return; } try{ const r=await api('/api/settings','PATCH',{vat_rate:v}); if(r.shop&&r.shop.vat_rate!==undefined)SHOP.vat=Number(r.shop.vat_rate); toast('VAT rate saved: '+SHOP.vat+'%'); }catch(err){ toast('Could not save the VAT rate',true); } render(); return; }
@@ -1796,6 +1846,7 @@ screen.addEventListener('input',e=>{
 // apply a typed discount when the cashier leaves the field (tab/click away or Enter blur)
 screen.addEventListener('change',e=>{
   if(e.target.id==='discIn'){ applyDiscount(parseInt((e.target.value||'').replace(/\D/g,''))||0); render(); }
+  const setv=e.target.closest('[data-setval]'); if(setv){ const key=setv.dataset.setval, val=setv.value; SETTINGS[key]=val; api('/api/settings','PATCH',{[key]:val}).then(r=>{ if(r.shop) SETTINGS=r.shop; toast('Saved'); }).catch(()=>toast('Could not save',true)); }
 });
 // Enter inside the discount field applies it straight away
 screen.addEventListener('keydown',e=>{
@@ -1825,13 +1876,13 @@ document.getElementById('hwmodal').addEventListener('click',e=>{
   const printDoc=(title,css,body)=>{ const w=window.open('','_blank','width=420,height=640'); if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); return; } w.document.write('<!doctype html><html><head><title>'+title+'</title>'+css+'</head><body>'+body+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250)}<'+'/script></body></html>'); w.document.close(); };
   if(hw.dataset.hw==='print'){
     const k=window.__hwkind||'receipt';
-    if(k==='label') printDoc('label',labelCss,labelHTML()); else printDoc('receipt',rcptCss,receiptHTML());
+    if(k==='label') printDoc('label',labelPrintCss(),labelHTML()); else printDoc('receipt',receiptPrintCss(),thermalReceiptHTML());
     document.getElementById('hwmodal').classList.remove('show');
   }
   if(hw.dataset.hw==='printlabels'){
     const p=PRODUCTS.find(x=>x.id===window.__labelProd)||PRODUCTS[0]; if(!p){ toast('No product selected',true); return; }
     const n=Math.max(1,Math.min(500,parseInt((document.getElementById('lblcopies')||{}).value,10)||1));
-    printDoc('labels',labelCss,labelSheetHTML(p,n));
+    printDoc('labels',labelPrintCss(),labelSheetHTML(p,n));
     document.getElementById('hwmodal').classList.remove('show');
     toast('Sent '+n+' label'+(n>1?'s':'')+' to print');
   }

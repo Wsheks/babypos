@@ -529,6 +529,10 @@ const server = http.createServer(async (req, res) => {
       TOGGLE_KEYS.forEach(k => {
         if (body[k] !== undefined) setSetting(k, (body[k] === '1' || body[k] === 1 || body[k] === true) ? '1' : '0');
       });
+      // Free-value settings (printer calibration, etc.) stored as strings.
+      ['receipt_width', 'receipt_text', 'label_size'].forEach(k => {
+        if (body[k] !== undefined) setSetting(k, String(body[k]));
+      });
       return sendJSON(res, 200, { shop: settingsOut() });
     }
 
