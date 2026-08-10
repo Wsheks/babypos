@@ -152,16 +152,16 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .method.card.on{border-color:var(--blue);background:var(--blue-t)}
 .method:hover{border-color:var(--ink2)}
 
-.mpesa-flow{margin-top:20px;text-align:center;padding:8px 0}
-.phone-il{width:130px;height:150px;margin:0 auto 18px;position:relative}
+.mpesa-flow{margin-top:6px;text-align:center;padding:4px 0}
+.phone-il{width:96px;height:112px;margin:0 auto 10px;position:relative}
 .phone-il .body{position:absolute;inset:0;border:5px solid var(--ink);border-radius:22px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:8px}
 .phone-il .ring{position:absolute;inset:-14px;border-radius:34px;border:3px solid var(--mpesa);animation:ring 1.9s ease-out infinite}
 @keyframes ring{0%{transform:scale(.92);opacity:.55}100%{transform:scale(1.12);opacity:0}}
 .phone-il .stk-ic{width:38px;height:38px;border-radius:10px;background:var(--mpesa-t);display:grid;place-items:center;color:var(--mpesa)}
 .phone-il .stk-ic svg{width:22px;height:22px}
 .phone-il .tt{font-size:10px;color:var(--ink2);font-weight:700;line-height:1.4}
-.wait-t{font-family:"Baloo 2";font-size:21px;font-weight:700}
-.wait-s{color:var(--ink2);font-size:14px;margin-top:6px;line-height:1.55;font-weight:600}
+.wait-t{font-family:"Baloo 2";font-size:18px;font-weight:700}
+.wait-s{color:var(--ink2);font-size:13.5px;margin-top:5px;line-height:1.5;font-weight:600}
 .wait-s b{color:var(--mpesa)}
 .co-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
 .co-actions button{border:1.5px solid var(--line);background:#fff;color:var(--ink2);border-radius:12px;padding:12px 18px;font-weight:800;font-size:13.5px}
@@ -962,15 +962,14 @@ function payPanel(){
           <div class="tt">Pay ilekela<br>KSh ${money(total)}</div></div></div>
         <div class="wait-t">Waiting for her PIN</div>
         <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>She just taps her M-PESA PIN. Expires in <b id="stkcount">2:00</b>.</div>
-        <div style="display:grid;gap:9px;margin-top:18px">
+        <div style="display:grid;gap:8px;margin-top:12px">
           <button class="bigbtn" data-pay="paid">${stkIcon} She has paid</button>
           <button class="bigbtn ghost" data-pay="send">Send the request again</button>
           <button class="bigbtn ghost" data-pay="match">She paid the till, match her code</button>
           ${matchOpen?`<div class="fld" style="margin:2px 0 0;text-align:left"><label>Her M-PESA confirmation code</label><input id="mcode" placeholder="e.g. TFA1B2C3D4" autocapitalize="characters" style="text-transform:uppercase;font-family:ui-monospace,'Courier New',monospace;letter-spacing:1px" value="${mpesaCode}"></div>
           <button class="bigbtn" data-pay="confirmcode">${stkIcon} Confirm this code and finish</button>`:''}
           <button class="bigbtn ghost" data-pay="park">Park this sale, serve the next customer</button>
-        </div>
-        <div class="tip" style="margin-top:14px;text-align:left"><div class="ic">${infoIcon}</div><p>No need to wait at the till. Park it and it moves to your parked sales; open it again when her payment comes through.</p></div></div>`;
+        </div></div>`;
     }
     return `<div class="fld"><label>Her M-PESA number</label><input value="0722 418 903"></div>
       <button class="bigbtn" data-pay="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg> Send request to her phone</button>
@@ -1047,6 +1046,7 @@ function checkout(){
     </div>
     <div class="co">
       <div class="co-card">
+        ${payStage==='choose' ? `
         <h3>How is she paying?</h3>
         <p class="hint">Whatever you choose shows on her side of the counter too.</p>
         <div class="methods">
@@ -1063,6 +1063,12 @@ function checkout(){
           <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:7px">Type the amount to take off the sale. Anything over 10% of the sale needs a manager.</div>
           ${discPending?`<div class="mgr" style="margin-top:12px"><div class="mt">Taking off KSh ${money(discPending)} is more than 10% of this sale, so a manager must approve it. Enter a manager PIN.</div><div style="display:flex;gap:10px;align-items:center"><input id="mgrpin" inputmode="numeric" maxlength="4" placeholder="0000"><button class="btn green sm" data-discapprove>Approve</button><button class="btn sm" data-disccancel>Cancel</button></div></div>`:''}
         </div>
+        ` : `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+          <div><h3 style="margin:0">Paying by ${ {mpesa:'M-PESA',card:'Card',cash:'Cash',split:'Split payment'}[payMethod] }</h3><div class="hint" style="margin:2px 0 0">KSh ${money(total)}${saleDiscount>0?` · ${money(saleDiscount)} off`:''}</div></div>
+          <button class="btn sm" data-pay="changemethod">Change</button>
+        </div>
+        `}
         <div id="paypanel">${payPanel()}</div>
       </div>
       <div class="co-card co-summary">
@@ -1732,6 +1738,7 @@ screen.addEventListener('click',async e=>{
       if(CART.length){ try{ const r=await api('/api/held','POST',{type:'await',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Awaiting M-PESA'}); HELD.unshift(r.held); }catch(err){ toast('Could not park the sale',true); } }
       CART=[]; resetPay(); view='sell'; toast('Parked. Serving the next customer.'); render();
     }
+    else if(a==='changemethod'){ payStage='choose'; matchOpen=false; mpesaCode=''; clearInterval(stkTimer); render(); }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
     else if(a==='paid'){ await finishSale(); }
     else if(a==='printreceipt'){ printHTML('Receipt '+((TXNS[0]||{}).ref||''), thermalReceiptHTML(TXNS[0]), receiptPrintCss()); }
