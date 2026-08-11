@@ -314,6 +314,16 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .paid-act{text-align:center}
 .paid-preview .receipt-scroll{max-height:66vh;overflow:auto;border-radius:12px}
 @media(max-width:820px){.paid-done{grid-template-columns:1fr}.paid-preview{order:2}.paid-preview .receipt-scroll{max-height:44vh}}
+/* on-screen receipt slip — same content and layout as what actually prints */
+.receipt-paper{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-width:300px;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;font-size:12.5px;font-weight:700;color:#111;line-height:1.4}
+.receipt-paper .tc{text-align:center}
+.receipt-paper .tb{font-weight:800}
+.receipt-paper .big{font-size:19px;font-weight:800}
+.receipt-paper .hr{border:0;border-top:1px dashed #999;margin:7px 0}
+.receipt-paper .rw{display:flex;justify-content:space-between;gap:6px}
+.receipt-paper .rw .r{text-align:right;white-space:nowrap}
+.receipt-paper .it{margin:2px 0}
+.receipt-paper .sub{font-size:11.5px}
 .paid-circle{width:92px;height:92px;border-radius:50%;background:var(--mpesa-t);display:grid;place-items:center;margin:0 auto 16px}
 .paid-circle svg{width:48px;height:48px;color:var(--mpesa)}
 .paid-amt{font-family:"Baloo 2";font-weight:800;font-size:36px;margin:4px 0}
@@ -1030,7 +1040,7 @@ function checkout(){
       </div>
       <div class="paid-preview">
         <div style="font-size:12px;color:var(--mut);font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;text-align:center">Receipt preview</div>
-        <div class="receipt-scroll">${TXNS[0]?receiptHTML(TXNS[0]):'<div style="color:var(--mut);font-weight:600">No receipt to show.</div>'}</div>
+        <div class="receipt-scroll">${TXNS[0]?`<div class="receipt-paper">${thermalReceiptHTML(TXNS[0])}</div>`:'<div style="color:var(--mut);font-weight:600">No receipt to show.</div>'}</div>
       </div>
     </div>`;
   }
@@ -1509,7 +1519,17 @@ async function connectPrinter(which,method){ const d=DEVICES[which]; try{
   render();
 }
 // Open a print window with any HTML body (used for reprints and the Z report).
-function printHTML(title, body, css){ const w=window.open('','_blank','width=430,height=650'); if(!w){ toast('Allow pop-ups to print, or open the till in Chrome',true); return; } w.document.write('<!doctype html><html><head><title>'+title+'</title>'+(css||'')+'</head><body>'+body+'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250)}<'+'/script></body></html>'); w.document.close(); }
+// Print through a hidden frame so the print dialog opens directly — no pop-up window, no pop-up blocker.
+function printHTML(title, body, css){
+  const old=document.getElementById('printframe'); if(old) old.remove();
+  const f=document.createElement('iframe'); f.id='printframe';
+  f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  const doc=f.contentWindow.document;
+  doc.open(); doc.write('<!doctype html><html><head><title>'+title+'</title>'+(css||'')+'</head><body>'+body+'</body></html>'); doc.close();
+  const go=()=>{ setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ toast('Could not open the print dialog',true); } setTimeout(()=>f.remove(),1500); }, 200); };
+  if(doc.readyState==='complete') go(); else f.onload=go;
+}
 
 /* ---- printer calibration (from Settings) ---- */
 const sv=(key,def)=>{ const v=SETTINGS[key]; return (v!==undefined&&v!=='')?v:def; };
