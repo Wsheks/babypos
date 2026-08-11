@@ -1023,24 +1023,18 @@ function checkout(){
   const total=dueT();
   if(payStage==='done'){
     const label={mpesa:'M-PESA',card:'Card',cash:'Cash',split:'Split payment'}[payMethod];
-    return `<div class="paid-done">
-      <div class="paid-act">
-        <div class="paid-circle">${stkIcon}</div>
-        <h2 class="baloo" style="font-size:26px">Paid, thank you</h2>
-        ${payMethod==='cash'
-          ? `<div style="color:var(--mut);font-weight:700;margin-bottom:2px">Change to give her</div>
-             <div class="paid-amt num">KSh ${money(paidChange)}</div>
-             <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
-          : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
-             <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}${paidRef?` · code ${paidRef}`:''}</div>`}
-        <div style="display:grid;gap:10px;margin:22px auto 0;width:100%;max-width:340px">
-          <button class="bigbtn" data-pay="printreceipt"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg> Print receipt for her</button>
-          <button class="bigbtn ghost" data-pay="newsale">No receipt, start a new sale</button>
-        </div>
-      </div>
-      <div class="paid-preview">
-        <div style="font-size:12px;color:var(--mut);font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;text-align:center">Receipt preview</div>
-        <div class="receipt-scroll">${TXNS[0]?`<div class="receipt-paper">${thermalReceiptHTML(TXNS[0])}</div>`:'<div style="color:var(--mut);font-weight:600">No receipt to show.</div>'}</div>
+    return `<div class="paid-wrap">
+      <div class="paid-circle">${stkIcon}</div>
+      <h2 class="baloo" style="font-size:27px">Paid, thank you</h2>
+      ${payMethod==='cash'
+        ? `<div style="color:var(--mut);font-weight:700;margin-bottom:2px">Change to give her</div>
+           <div class="paid-amt num">KSh ${money(paidChange)}</div>
+           <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
+        : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
+           <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}${paidRef?` · code ${paidRef}`:''}</div>`}
+      <div style="display:grid;gap:10px;margin:24px auto 0;width:100%;max-width:360px">
+        <button class="bigbtn" data-pay="printreceipt"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg> Print receipt for her</button>
+        <button class="bigbtn ghost" data-pay="newsale">No receipt, start a new sale</button>
       </div>
     </div>`;
   }
