@@ -606,10 +606,10 @@ html,body{max-width:100%;overflow-x:clip}
   <button class="close" id="helpClose">✕</button>
   <h3>A little help</h3>
   <p style="color:var(--ink2);font-size:13.5px;margin:0 0 6px">Quick answers for the till. Nothing here can break a sale.</p>
-  <div class="qa"><div class="q">Her M-PESA is slow, what do I do?</div><div class="a">Tap Send again to nudge her phone. If she has already paid the till, tap Match a code and paste the M-PESA message. The sale only closes once the money shows.</div></div>
-  <div class="qa"><div class="q">She wants to pay half now, half later</div><div class="a">On the Pay screen choose Split. Take what she has, the rest stays open and the till holds the items for her.</div></div>
+  <div class="qa"><div class="q">The M-PESA is slow, what do I do?</div><div class="a">Tap Send again to nudge the phone. If the customer has already paid the till, tap Match a code and paste the M-PESA message. The sale only closes once the money shows.</div></div>
+  <div class="qa"><div class="q">The customer wants to pay half now, half later</div><div class="a">On the Pay screen choose Split. Take what they have, the rest stays open and the till holds the items.</div></div>
   <div class="qa"><div class="q">A button is missing for me</div><div class="a">Some things, like giving a big discount or sending a refund, are set for managers only. Ask a manager to sign in, or the owner can turn it on for you in Settings.</div></div>
-  <div class="qa"><div class="q">The size she wants is out of stock</div><div class="a">Tap the customer name and add a size reminder. She gets a WhatsApp the day the next delivery lands.</div></div>
+  <div class="qa"><div class="q">The size the customer wants is out of stock</div><div class="a">Tap the customer name and add a size reminder. They get a WhatsApp the day the next delivery lands.</div></div>
 </aside>
 
 <script>
@@ -975,27 +975,27 @@ function payPanel(){
         <div class="phone-il"><div class="ring"></div><div class="body">
           <div class="stk-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7H14a3.5 3.5 0 010 7H6"/></svg></div>
           <div class="tt">Pay ilekela<br>KSh ${money(total)}</div></div></div>
-        <div class="wait-t">Waiting for her PIN</div>
-        <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>She just taps her M-PESA PIN. Expires in <b id="stkcount">2:00</b>.</div>
+        <div class="wait-t">Waiting for the M-PESA PIN</div>
+        <div class="wait-s">A request has gone to <b>0722 418 903</b>.<br>The customer taps their M-PESA PIN. Expires in <b id="stkcount">2:00</b>.</div>
         <div style="display:grid;gap:8px;margin-top:12px">
-          <button class="bigbtn" data-pay="paid">${stkIcon} She has paid</button>
+          <button class="bigbtn" data-pay="paid">${stkIcon} Payment received</button>
           <button class="bigbtn ghost" data-pay="send">Send the request again</button>
-          <button class="bigbtn ghost" data-pay="match">She paid the till, match her code</button>
-          ${matchOpen?`<div class="fld" style="margin:2px 0 0;text-align:left"><label>Her M-PESA confirmation code</label><input id="mcode" placeholder="e.g. TFA1B2C3D4" autocapitalize="characters" style="text-transform:uppercase;font-family:ui-monospace,'Courier New',monospace;letter-spacing:1px" value="${mpesaCode}"></div>
+          <button class="bigbtn ghost" data-pay="match">Paid to the till, match the code</button>
+          ${matchOpen?`<div class="fld" style="margin:2px 0 0;text-align:left"><label>M-PESA confirmation code</label><input id="mcode" placeholder="e.g. TFA1B2C3D4" autocapitalize="characters" style="text-transform:uppercase;font-family:ui-monospace,'Courier New',monospace;letter-spacing:1px" value="${mpesaCode}"></div>
           <button class="bigbtn" data-pay="confirmcode">${stkIcon} Confirm this code and finish</button>`:''}
           <button class="bigbtn ghost" data-pay="park">Park this sale, serve the next customer</button>
         </div></div>`;
     }
-    return `<div class="fld"><label>Her M-PESA number</label><input value="0722 418 903"></div>
-      <button class="bigbtn" data-pay="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg> Send request to her phone</button>
-      <div class="tip" style="margin-top:16px"><div class="ic">${infoIcon}</div><p>She gets a prompt on her phone and enters her PIN. Nothing to type on this side.</p></div>`;
+    return `<div class="fld"><label>Customer's M-PESA number</label><input value="0722 418 903"></div>
+      <button class="bigbtn" data-pay="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg> Send request to the phone</button>
+      <div class="tip" style="margin-top:16px"><div class="ic">${infoIcon}</div><p>A prompt appears on the customer's phone to enter their PIN. Nothing to type on this side.</p></div>`;
   }
   if(payMethod==='card'){
     if(payStage==='cardsent'){
       return `<div style="text-align:center;padding:18px 0 6px">
         <div class="paid-circle" style="background:var(--blue-t)"><svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg></div>
         <div class="baloo" style="font-size:19px;font-weight:700">Sent to the terminal</div>
-        <div style="color:var(--ink2);font-weight:600;margin-top:6px">She can tap or insert her card now for KSh ${money(total)}.</div>
+        <div style="color:var(--ink2);font-weight:600;margin-top:6px">Tap or insert the card now for KSh ${money(total)}.</div>
         <button class="bigbtn blue" style="margin-top:20px" data-pay="paid">${stkIcon} Payment received</button></div>`;
     }
     return `<button class="bigbtn blue" data-pay="cardsend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg> Send KSh ${money(total)} to the terminal</button>
@@ -1003,11 +1003,11 @@ function payPanel(){
   }
   if(payMethod==='cash'){
     const change=Math.max(0,cashGiven-total), enough=cashGiven>=total;
-    return `<div class="fld"><label>Cash she gave you</label><input id="cashin" value="${cashGiven||''}" placeholder="0" inputmode="numeric"></div>
+    return `<div class="fld"><label>Cash given</label><input id="cashin" value="${cashGiven||''}" placeholder="0" inputmode="numeric"></div>
       <div class="quick">
         ${quickTenders(total).map((amt,i)=>`<button data-cash="${amt}">${i===0?`Exact, ${money(amt)}`:money(amt)}</button>`).join('')}
       </div>
-      <div class="changebox" style="background:${enough?'var(--mpesa-t)':'#f6efe3'}"><span>Change to give her</span><b class="num baloo" style="font-size:20px;color:${enough?'var(--mpesa)':'var(--mut)'}">KSh ${money(change)}</b></div>
+      <div class="changebox" style="background:${enough?'var(--mpesa-t)':'#f6efe3'}"><span>Change to give</span><b class="num baloo" style="font-size:20px;color:${enough?'var(--mpesa)':'var(--mut)'}">KSh ${money(change)}</b></div>
       <button class="bigbtn sun" style="margin-top:16px" data-pay="paid" ${enough?'':'disabled'}>${stkIcon} Done, take the cash</button>`;
   }
   const paid=splitParts.reduce((t,x)=>t+x.amt,0), remain=Math.max(0,total-paid);
@@ -1027,21 +1027,21 @@ function checkout(){
       <div class="paid-circle">${stkIcon}</div>
       <h2 class="baloo" style="font-size:27px">Paid, thank you</h2>
       ${payMethod==='cash'
-        ? `<div style="color:var(--mut);font-weight:700;margin-bottom:2px">Change to give her</div>
+        ? `<div style="color:var(--mut);font-weight:700;margin-bottom:2px">Change to give</div>
            <div class="paid-amt num">KSh ${money(paidChange)}</div>
-           <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · she gave ${money(paidTendered)} · paid by ${label}</div>`
+           <div style="color:var(--mut);font-weight:600">Total ${money(paidAmount)} · cash given ${money(paidTendered)} · paid by ${label}</div>`
         : `<div class="paid-amt num">KSh ${money(paidAmount)}</div>
            <div style="color:var(--mut);font-weight:600">Sale for ${saleCustomer?saleCustomer.name:'Walk-in'} · paid by ${label}${paidRef?` · code ${paidRef}`:''}</div>`}
       <div style="display:grid;gap:10px;margin:24px auto 0;width:100%;max-width:360px">
-        <button class="bigbtn" data-pay="printreceipt"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg> Print receipt for her</button>
+        <button class="bigbtn" data-pay="printreceipt"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="7" rx="1.5"/><path d="M6 14h12v7H6z"/></svg> Print receipt</button>
         <button class="bigbtn ghost" data-pay="newsale">No receipt, start a new sale</button>
       </div>
     </div>`;
   }
   const methods=[
-    ['mpesa','M-PESA','Send a request to her phone','<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/>'],
+    ['mpesa','M-PESA','Send a request to the phone','<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/>'],
     ['card','Card','Tap or insert on the terminal','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/>'],
-    ['cash','Cash','We work out her change','<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>'],
+    ['cash','Cash','We work out the change','<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>'],
     ['split','Split it','Part one way, part another','<path d="M12 3v18M12 8H7a2 2 0 00-2 2M12 8h5a2 2 0 012 2"/>'],
   ];
   const paid=splitParts.reduce((t,x)=>t+x.amt,0);
@@ -1058,8 +1058,8 @@ function checkout(){
     <div class="co">
       <div class="co-card">
         ${payStage==='choose' ? `
-        <h3>How is she paying?</h3>
-        <p class="hint">Whatever you choose shows on her side of the counter too.</p>
+        <h3>How is the customer paying?</h3>
+        <p class="hint">Whatever you choose shows on the customer's side of the counter too.</p>
         <div class="methods">
           ${methods.map(m=>`<button class="method ${m[0]} ${payMethod===m[0]?'on':''}" data-pm="${m[0]}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m[3]}</svg></div><div><div class="t">${m[1]}</div><div class="d">${m[2]}</div></div></button>`).join('')}
         </div>
@@ -1092,7 +1092,7 @@ function checkout(){
           <div class="paid"><span>Paid so far</span><span class="num">KSh ${money(paid)}</span></div>
           <div class="due"><span>Still to pay</span><span class="num">KSh ${money(Math.max(0,total-paid))}</span></div>
         </div>
-        <div style="margin-top:18px;font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">The receipt sends to her WhatsApp and prints as an eTIMS receipt the moment the money clears.</div>
+        <div style="margin-top:18px;font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">The receipt sends to the customer's WhatsApp and prints as an eTIMS receipt the moment the money clears.</div>
       </div>
     </div>`;
 }
@@ -1220,7 +1220,7 @@ function returns(){
   const needYou=RETURNS.filter(r=>r.st==='wait').length;
   const reasons={}; RETURNS.forEach(r=>{ if(r.why) reasons[r.why]=(reasons[r.why]||0)+1; });
   const topReason=Object.entries(reasons).sort((a,b)=>b[1]-a[1])[0];
-  const REASONS=['Wrong size','Changed her mind','Faulty item','Wrong item given','Other'];
+  const REASONS=['Wrong size','Changed their mind','Faulty item','Wrong item given','Other'];
   return `<div class="phead"><h2>Returns and swaps</h2><p>Most returns here are just a size. We swap first, and only refund when there is nothing to swap into. Within 14 days with a receipt.</p></div>
   <div class="stats">
     <div class="stat"><div class="l">This month</div><div class="v num">${monthN}</div></div>
@@ -1302,7 +1302,7 @@ function settings(){
   if(setTab==='pay'){
     body = `<div class="panel">
       <div class="pt"><h3>How you get paid</h3></div>
-      <div class="set-row"><div><div class="t">M-PESA request to the phone</div><div class="d">Buy Goods till ${SHOP.till}. She approves with her PIN, no codes to type.</div></div><div class="val"><button class="switch ${setOn('pay_mpesa',true)?'on':''}" data-swkey="pay_mpesa"></button></div></div>
+      <div class="set-row"><div><div class="t">M-PESA request to the phone</div><div class="d">Buy Goods till ${SHOP.till}. Approved with a PIN on the phone, no codes to type.</div></div><div class="val"><button class="switch ${setOn('pay_mpesa',true)?'on':''}" data-swkey="pay_mpesa"></button></div></div>
       <div class="set-row"><div><div class="t">Card terminal</div><div class="d">Equity, paired to this counter. Visa and Mastercard.</div></div><div class="val">Connected<button class="switch ${setOn('pay_card',true)?'on':''}" data-swkey="pay_card"></button></div></div>
       <div class="set-row"><div><div class="t">Cash</div><div class="d">Change is worked out for the cashier.</div></div><div class="val"><button class="switch ${setOn('pay_cash',true)?'on':''}" data-swkey="pay_cash"></button></div></div>
       <div class="field"><label>Cash in the drawer at opening</label><input value="KSh 3,000"></div>
@@ -1331,7 +1331,7 @@ function settings(){
       <div class="pt"><h3>Selling online</h3></div>
       <div class="set-row"><div><div class="t">WhatsApp catalogue</div><div class="d">Prices and stock counts refresh every hour.</div></div><div class="val"><button class="switch ${setOn('chan_whatsapp_catalogue',true)?'on':''}" data-swkey="chan_whatsapp_catalogue"></button></div></div>
       <div class="set-row"><div><div class="t">Hide items that are out of stock</div><div class="d">So customers do not ask for what you do not have.</div></div><div class="val"><button class="switch ${setOn('chan_hide_out_of_stock',true)?'on':''}" data-swkey="chan_hide_out_of_stock"></button></div></div>
-      <div class="set-row"><div><div class="t">Next size reminder</div><div class="d">Messages a mum when her child is due the next size up.</div></div><div class="val"><button class="switch ${setOn('chan_next_size_reminder',true)?'on':''}" data-swkey="chan_next_size_reminder"></button></div></div>
+      <div class="set-row"><div><div class="t">Next size reminder</div><div class="d">Messages the customer when their child is due the next size up.</div></div><div class="val"><button class="switch ${setOn('chan_next_size_reminder',true)?'on':''}" data-swkey="chan_next_size_reminder"></button></div></div>
     </div>`;
   }
   if(setTab==='shop'){
@@ -1754,7 +1754,7 @@ screen.addEventListener('click',async e=>{
     if(a==='back'){ view='sell'; render(); }
     else if(a==='send'){ payStage='waiting'; matchOpen=false; render(); startStkCountdown(120); }
     else if(a==='match'){ matchOpen=!matchOpen; render(); if(matchOpen){ const el=document.getElementById('mcode'); if(el) el.focus(); } }
-    else if(a==='confirmcode'){ const el=document.getElementById('mcode'); const code=(el?el.value:'').trim().toUpperCase(); if(code.length<6){ toast('Enter her full M-PESA code (about 10 characters)',true); return; } mpesaCode=code; await finishSale(); }
+    else if(a==='confirmcode'){ const el=document.getElementById('mcode'); const code=(el?el.value:'').trim().toUpperCase(); if(code.length<6){ toast('Enter the full M-PESA code (about 10 characters)',true); return; } mpesaCode=code; await finishSale(); }
     else if(a==='park'){
       if(CART.length){ try{ const r=await api('/api/held','POST',{type:'await',cust:saleCustomer?saleCustomer.name:'Walk-in',deposit:0,lines:CART.map(l=>({n:l.n,a:l.a,q:l.q,p:l.p,vt:l.vt})),at:'Awaiting M-PESA'}); HELD.unshift(r.held); }catch(err){ toast('Could not park the sale',true); } }
       CART=[]; resetPay(); view='sell'; toast('Parked. Serving the next customer.'); render();
