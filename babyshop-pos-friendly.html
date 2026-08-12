@@ -1792,7 +1792,7 @@ screen.addEventListener('click',async e=>{
   const expd=e.target.closest('[data-expdel]'); if(expd){ const item=EXPENSES[+expd.dataset.expdel]; if(item && confirm('Remove this expense?')){ try{ await api('/api/expenses/'+item.id,'DELETE'); EXPENSES=EXPENSES.filter(x=>x!==item); toast('Expense removed'); }catch(err){ toast('Could not remove it',true); } render(); } return; }
 
   // returns: record / approve / swap
-  const nr=e.target.closest('[data-newreturn]'); if(nr){ newReturnOpen=!newReturnOpen; if(!newReturnOpen) returnFromSale=null; render(); return; }
+  const nr=e.target.closest('[data-newreturn]'); if(nr){ newReturnOpen=!newReturnOpen; if(!newReturnOpen) returnFromSale=null; render(); if(newReturnOpen) window.scrollTo(0,0); return; }
   const svr=e.target.closest('[data-savereturn]'); if(svr){
     const g=id=>document.getElementById(id);
     const itemEl=g('ret-item');
@@ -1805,10 +1805,10 @@ screen.addEventListener('click',async e=>{
     if(type==='refund'&&value<=0){ toast('Enter the refund amount',true); g('ret-amt').focus(); return; }
     try{ const r=await api('/api/returns','POST',{customer:(g('ret-cust').value||'').trim()||'Walk-in',item,reason,type,value,approved:type==='refund'?can(6):false,saleRef:returnFromSale?returnFromSale.ref:null,cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; newReturnOpen=false; returnFromSale=null; toast(type==='swap'?'Swap recorded':(can(6)?'Refund recorded':'Refund saved, waiting for a manager')); }
     catch(err){ toast('Could not save the return',true); }
-    render(); return;
+    render(); window.scrollTo(0,0); return;
   }
-  const rap=e.target.closest('[data-retapprove]'); if(rap){ try{ const r=await api('/api/returns/'+rap.dataset.retapprove,'PATCH',{action:'refund',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Refund approved'); }catch(err){ toast('Could not approve',true); } render(); return; }
-  const rsw=e.target.closest('[data-retswap]'); if(rsw){ try{ const r=await api('/api/returns/'+rsw.dataset.retswap,'PATCH',{action:'swap',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Marked as swapped'); }catch(err){ toast('Could not update',true); } render(); return; }
+  const rap=e.target.closest('[data-retapprove]'); if(rap){ try{ const r=await api('/api/returns/'+rap.dataset.retapprove,'PATCH',{action:'refund',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Refund approved'); }catch(err){ toast('Could not approve',true); } render(); window.scrollTo(0,0); return; }
+  const rsw=e.target.closest('[data-retswap]'); if(rsw){ try{ const r=await api('/api/returns/'+rsw.dataset.retswap,'PATCH',{action:'swap',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Marked as swapped'); }catch(err){ toast('Could not update',true); } render(); window.scrollTo(0,0); return; }
 
   // stock: products / deliveries / add product / accept delivery
   const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
@@ -1879,7 +1879,7 @@ screen.addEventListener('click',async e=>{
   const tlb=e.target.closest('[data-testlabel]'); if(tlb){ const p=PRODUCTS[0]; if(!p){ toast('Add a product first',true); return; } printHTML('Test label', labelSheetHTML(p,1), labelPrintCss()); return; }
   const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), receiptPrintCss()); toast('Z report ready to print'); return; }
   const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), thermalReceiptHTML(t), receiptPrintCss()); return; }
-  const sret=e.target.closest('[data-startreturn]'); if(sret){ const ref=sret.dataset.startreturn; returnFromSale=TXNS.find(x=>String(x.ref)===String(ref))||null; newReturnOpen=true; view='returns'; render(); return; }
+  const sret=e.target.closest('[data-startreturn]'); if(sret){ const ref=sret.dataset.startreturn; returnFromSale=TXNS.find(x=>String(x.ref)===String(ref))||null; newReturnOpen=true; view='returns'; render(); window.scrollTo(0,0); return; }
   const scst=e.target.closest('[data-setcust]'); if(scst){ const nm=prompt('Customer name for the receipt', saleCustomer?saleCustomer.name:''); if(nm!==null){ const n=nm.trim(); saleCustomer = n ? {name:n, detail:'Added at the till'} : null; render(); } return; }
   const svat=e.target.closest('[data-savevat]'); if(svat){ const el=document.getElementById('vatInput'); let v=parseInt((el&&el.value||'').replace(/\D/g,'')); if(!Number.isFinite(v)||v<0||v>100){ toast('VAT rate must be a whole number from 0 to 100',true); if(el)el.focus(); return; } try{ const r=await api('/api/settings','PATCH',{vat_rate:v}); if(r.shop&&r.shop.vat_rate!==undefined)SHOP.vat=Number(r.shop.vat_rate); toast('VAT rate saved: '+SHOP.vat+'%'); }catch(err){ toast('Could not save the VAT rate',true); } render(); return; }
   // stock: change a product's VAT status (standard / exempt)
