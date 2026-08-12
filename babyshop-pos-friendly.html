@@ -135,12 +135,13 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 
 /* ---------------- CHECKOUT ---------------- */
 .co{display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start}
-.co-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}
+.co-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.co-card>h3{margin:0 0 4px}.co-card .hint{margin:0 0 12px}
 .co-card h3{margin:0 0 4px;font-size:18px;font-weight:800}
 .co-card .hint{color:var(--ink2);font-size:13.5px;margin:0 0 18px}
-.methods{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.method{border:2px solid var(--line);background:var(--card);border-radius:16px;padding:16px;display:flex;align-items:center;gap:13px;text-align:left}
-.method .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;flex:none}
+.methods{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.method{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:12px 13px;display:flex;align-items:center;gap:12px;text-align:left}
+.method .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;flex:none}
 .method .ic svg{width:24px;height:24px}
 .method .t{font-weight:800;font-size:15px}
 .method .d{font-size:12px;color:var(--mut);margin-top:2px;font-weight:600}
@@ -927,7 +928,7 @@ function sell(){
 
 /* -------- CHECKOUT (a step inside the sale, not a menu item) -------- */
 let payMethod='mpesa', payStage='choose', cashGiven=0, splitParts=[], paidAmount=0, paidChange=0, paidTendered=0;
-let matchOpen=false, mpesaCode='', paidRef='';
+let matchOpen=false, mpesaCode='', paidRef='', discOpen=false;
 let stkTimer=null;
 // Live countdown on the M-PESA waiting screen. Restarts each time a request is sent.
 function startStkCountdown(seconds){
@@ -938,7 +939,7 @@ function startStkCountdown(seconds){
     const m=Math.floor(left/60), s=left%60; el.textContent=m+':'+String(s).padStart(2,'0'); left--; };
   tick(); stkTimer=setInterval(tick,1000);
 }
-function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;paidChange=0;paidTendered=0;matchOpen=false;mpesaCode='';paidRef='';clearInterval(stkTimer);}
+function resetPay(){payMethod='mpesa';payStage='choose';cashGiven=0;splitParts=[];saleDiscount=0;discPending=0;paidChange=0;paidTendered=0;matchOpen=false;mpesaCode='';paidRef='';discOpen=false;clearInterval(stkTimer);}
 // Close the sale on the server, mark it paid and move to the receipt step.
 async function finishSale(){
   paidAmount=dueT();
@@ -1063,17 +1064,16 @@ function checkout(){
         <div class="methods">
           ${methods.map(m=>`<button class="method ${m[0]} ${payMethod===m[0]?'on':''}" data-pm="${m[0]}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m[3]}</svg></div><div><div class="t">${m[1]}</div><div class="d">${m[2]}</div></div></button>`).join('')}
         </div>
-        <div style="border-top:1px solid var(--line2);margin:4px 0 16px;padding-top:14px">
-          <h3 style="font-size:15px;margin-bottom:9px">Discount</h3>
+        ${(discOpen||saleDiscount>0||discPending>0)?`<div style="border-top:1px solid var(--line2);margin:2px 0 12px;padding-top:12px">
           <div class="disc-amt">
             <span class="ksh">KSh</span>
             <input id="discIn" inputmode="numeric" placeholder="0" value="${saleDiscount||''}">
             <button class="btn sm" data-discapply>Apply</button>
             ${(saleDiscount>0||discPending>0)?`<button class="btn sm" data-disc="0">Clear</button>`:''}
           </div>
-          <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:7px">Type the amount to take off the sale. Anything over 10% of the sale needs a manager.</div>
-          ${discPending?`<div class="mgr" style="margin-top:12px"><div class="mt">Taking off KSh ${money(discPending)} is more than 10% of this sale, so a manager must approve it. Enter a manager PIN.</div><div style="display:flex;gap:10px;align-items:center"><input id="mgrpin" inputmode="numeric" maxlength="4" placeholder="0000"><button class="btn green sm" data-discapprove>Approve</button><button class="btn sm" data-disccancel>Cancel</button></div></div>`:''}
-        </div>
+          <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:6px">Amount off the sale. Over 10% needs a manager.</div>
+          ${discPending?`<div class="mgr" style="margin-top:10px"><div class="mt">Taking off KSh ${money(discPending)} is more than 10% of this sale, so a manager must approve it. Enter a manager PIN.</div><div style="display:flex;gap:10px;align-items:center"><input id="mgrpin" inputmode="numeric" maxlength="4" placeholder="0000"><button class="btn green sm" data-discapprove>Approve</button><button class="btn sm" data-disccancel>Cancel</button></div></div>`:''}
+        </div>`:`<button class="btn ghost sm" data-discopen style="margin:2px 0 12px">+ Add a discount</button>`}
         ` : `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
           <div><h3 style="margin:0">Paying by ${ {mpesa:'M-PESA',card:'Card',cash:'Cash',split:'Split payment'}[payMethod] }</h3><div class="hint" style="margin:2px 0 0">KSh ${money(total)}${saleDiscount>0?` · ${money(saleDiscount)} off`:''}</div></div>
@@ -1760,6 +1760,7 @@ screen.addEventListener('click',async e=>{
       CART=[]; resetPay(); view='sell'; toast('Parked. Serving the next customer.'); render();
     }
     else if(a==='changemethod'){ payStage='choose'; matchOpen=false; mpesaCode=''; clearInterval(stkTimer); render(); }
+    else if(a==='discopen'){ discOpen=true; render(); }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
     else if(a==='paid'){ await finishSale(); }
     else if(a==='printreceipt'){ printHTML('Receipt '+((TXNS[0]||{}).ref||''), thermalReceiptHTML(TXNS[0]), receiptPrintCss()); }
