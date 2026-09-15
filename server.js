@@ -368,6 +368,8 @@ function buildCatalogue() {
     const ages = (r.age_min != null && r.age_max != null) ? { min: r.age_min, max: r.age_max } : deriveAges(r.age_range);
     const sizes = safeArr(r.sizes);
     const colours = safeArr(r.colours);
+    // when no explicit size, use the age range as the size chip (e.g. "6 to 24 months" -> "6-24m")
+    const ageSize = (() => { const t = (r.age_range || '').toLowerCase(); if (!t || t.includes('all ages')) return null; const n = t.match(/\d+/g); if (!n) return null; const u = t.includes('month') ? 'm' : 'y'; return n.length >= 2 ? `${n[0]}-${n[1]}${u}` : `${n[0]}${u}`; })();
     const item = {
       sku: r.sku || ('IK-' + r.id),
       name: r.name,
@@ -377,7 +379,7 @@ function buildCatalogue() {
       ageMax: Number(ages.max) || 0,
       price: r.selling_price || 0,
       stock: r.stock_qty || 0,
-      sizes: sizes.length ? sizes : ['One size'],
+      sizes: sizes.length ? sizes : (ageSize ? [ageSize] : ['One size']),
       colours: colours.length ? colours : ['teal'],
       tags: r.featured ? ['featured'] : [],
       image: r.image || '',

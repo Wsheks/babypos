@@ -1173,7 +1173,6 @@ function productsPanel(){
       <div class="field"><label>Category</label>
         ${(()=>{ const base=['Clothing Sets','Dresses & Skirts','Rompers & Onesies','Jackets & Sweaters','Tops & Bottoms','Hats, Socks & Accessories','Shoes','Feeding & Weaning','Bath & Changing','Nursery & Gear','Blankets & Bedding','Mum Care','Toys']; const cats=[...new Set([...PRODUCTS.map(p=>p.category).filter(Boolean),...base])].sort(); return `<select id="np-category" class="sel" style="width:100%;padding:12px 14px">${cats.map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select>`; })()}
         <input id="np-category-new" placeholder="Type the new category name" style="margin-top:8px;display:none"></div>
-      <div class="field"><label>Sizes (comma separated)</label><input id="np-sizes" placeholder="e.g. 0-3m, 3-6m, 1-2y"></div>
       <div class="field"><label>Was price (KSh, optional)</label><input id="np-was" placeholder="for a Save badge" inputmode="numeric"></div>
       <div class="field" style="grid-column:1 / -1"><label>Item photo (optional)</label>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -1843,10 +1842,12 @@ screen.addEventListener('click',async e=>{
     const g=id=>document.getElementById(id), val=id=>{const e=g(id);return e?e.value:'';}, num=v=>parseInt((v||'').replace(/\D/g,''))||0;
     const name=(g('np-name').value||'').trim(); if(!name){ g('np-name').focus(); return; }
     const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
-    const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
     let category=val('np-category'); if(category==='__new__') category=(val('np-category-new')||'').trim();
     const af=(val('np-agefrom')||'').replace(/\D/g,''), at=(val('np-ageto')||'').replace(/\D/g,''), au=(val('np-ageunit')||'Months').toLowerCase();
     const age = (af&&at)?`${af} to ${at} ${au}`:(af||at)?`${af||at} ${au}`:'All ages';
+    // the website size chip is taken straight from the age range (e.g. 6 to 24 months -> "6-24m")
+    const su=au.startsWith('month')?'m':'y';
+    const sizes = (af&&at)?[`${af}-${at}${su}`]:(af||at)?[`${af||at}${su}`]:[];
     const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
