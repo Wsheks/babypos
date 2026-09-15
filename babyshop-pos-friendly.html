@@ -1149,7 +1149,9 @@ function productsPanel(){
     <div class="pt" style="padding:0 0 12px"><h3>Add a new product</h3></div>
     <div class="np-grid">
       <div class="field" style="grid-column:1 / -1"><label>What is it called</label><input id="np-name" placeholder="e.g. Corduroy dungarees"></div>
-      <div class="field"><label>Age range</label><input id="np-age" placeholder="e.g. 1 to 2 years"></div>
+      <div class="field"><label>Age range</label>
+        ${(()=>{ const std=['0 to 3 months','3 to 6 months','6 to 12 months','1 to 2 years','2 to 3 years','3 to 4 years','4 to 5 years','5 to 6 years','6 to 8 years','8 to 10 years','All ages']; const extra=[...new Set(PRODUCTS.map(p=>p.a).filter(Boolean))].filter(a=>!std.includes(a)); return `<select id="np-age" class="sel" style="width:100%;padding:12px 14px">${[...std,...extra].map(a=>`<option${a==='All ages'?' selected':''}>${a}</option>`).join('')}<option value="__new__">+ Other age…</option></select>`; })()}
+        <input id="np-age-new" placeholder="Type the age range, e.g. 18 to 24 months" style="margin-top:8px;display:none"></div>
       <div class="field"><label>Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric"></div>
       <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
       <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
@@ -1829,7 +1831,8 @@ screen.addEventListener('click',async e=>{
     const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
     const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
     let category=val('np-category'); if(category==='__new__') category=(val('np-category-new')||'').trim();
-    const body={ n:name, a:(g('np-age').value||'').trim()||'All ages', p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
+    let age=val('np-age'); if(age==='__new__') age=(val('np-age-new')||'').trim(); age=age||'All ages';
+    const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
     try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
@@ -1948,6 +1951,7 @@ screen.addEventListener('change',async e=>{
   if(e.target.id==='ret-item'&&e.target.tagName==='SELECT'){ const opt=e.target.selectedOptions[0]; const amt=document.getElementById('ret-amt'); if(opt&&amt) amt.value=opt.dataset.price||''; }
   // category dropdown: show the "new category" box when + New category is picked
   if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
+  if(e.target.id==='np-age'){ const nf=document.getElementById('np-age-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
   // product photo: downscale, upload, then show a preview and fill the image link
   if(e.target.id==='np-imgfile'){ const f=e.target.files&&e.target.files[0]; if(!f) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
     try{ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); const img=document.getElementById('np-image'); if(img) img.value=r.url; const pv=document.getElementById('np-imgpreview'); if(pv){ pv.src=r.url; pv.style.display=''; } if(st){ st.textContent='Photo added'; st.style.color='var(--mpesa)'; } }
