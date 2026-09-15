@@ -1156,10 +1156,18 @@ function productsPanel(){
       <div class="field"><label>Wholesale price (KSh)</label><input id="np-whole" placeholder="e.g. 1800 (optional)" inputmode="numeric"></div>
       <div class="field" style="grid-column:1 / -1"><label>VAT</label><select id="np-vat" class="sel" style="padding:12px 14px;width:100%"><option value="standard">Standard rate${setOn('vat_registered',false)?` (${SHOP.vat}%, included in the price)`:' (VAT applies once you register)'}</option><option value="exempt">VAT exempt (never carries VAT)</option></select></div>
       <div class="field" style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:12px"><label style="color:var(--sun-d)">For the shop website</label></div>
-      <div class="field"><label>Category</label><input id="np-category" placeholder="e.g. Newborn, Tops, Warmth"></div>
+      <div class="field"><label>Category</label>
+        ${(()=>{ const base=['Clothing Sets','Dresses & Skirts','Rompers & Onesies','Jackets & Sweaters','Tops & Bottoms','Hats, Socks & Accessories','Shoes','Feeding & Weaning','Bath & Changing','Nursery & Gear','Blankets & Bedding','Mum Care','Toys']; const cats=[...new Set([...PRODUCTS.map(p=>p.category).filter(Boolean),...base])].sort(); return `<select id="np-category" class="sel" style="width:100%;padding:12px 14px">${cats.map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select>`; })()}
+        <input id="np-category-new" placeholder="Type the new category name" style="margin-top:8px;display:none"></div>
       <div class="field"><label>Sizes (comma separated)</label><input id="np-sizes" placeholder="e.g. 0-3m, 3-6m, 1-2y"></div>
       <div class="field"><label>Was price (KSh, optional)</label><input id="np-was" placeholder="for a Save badge" inputmode="numeric"></div>
-      <div class="field"><label>Image link (optional)</label><input id="np-image" placeholder="Leave blank to draw a picture"></div>
+      <div class="field" style="grid-column:1 / -1"><label>Item photo (optional)</label>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <img id="np-imgpreview" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2);display:none">
+          <label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload a photo<input id="np-imgfile" type="file" accept="image/*" style="display:none"></label>
+          <span id="np-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">Take a picture or choose from the device</span>
+        </div>
+        <input id="np-image" placeholder="…or paste an image link" style="margin-top:8px"></div>
       <div class="field" style="grid-column:1 / -1"><label>Colours shown online</label><div id="np-colours" style="display:flex;flex-wrap:wrap;gap:8px">${Object.entries(WEB_PALETTE).map(([k,hex])=>`<label style="display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line2);border-radius:999px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--ink2);cursor:pointer"><input type="checkbox" value="${k}"><span style="width:13px;height:13px;border-radius:50%;background:${hex};display:inline-block"></span>${k}</label>`).join('')}</div></div>
       <div class="field" style="grid-column:1 / -1;flex-direction:row;align-items:center;gap:20px;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-online" checked> Sell this on the website</label><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-featured"> Feature it (Picked for you)</label></div>
     </div>
@@ -1820,8 +1828,9 @@ screen.addEventListener('click',async e=>{
     const name=(g('np-name').value||'').trim(); if(!name){ g('np-name').focus(); return; }
     const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
     const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    let category=val('np-category'); if(category==='__new__') category=(val('np-category-new')||'').trim();
     const body={ n:name, a:(g('np-age').value||'').trim()||'All ages', p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
-      category:(val('np-category')||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
+      category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
     try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
     catch(err){ toast('Could not save the product',true); return; }
@@ -1930,11 +1939,20 @@ screen.addEventListener('input',e=>{
   }
 });
 // apply a typed discount when the cashier leaves the field (tab/click away or Enter blur)
-screen.addEventListener('change',e=>{
+// Shrink a chosen photo in the browser before upload, so it stays small and fast.
+function fileToDataUrl(file, maxDim, quality){ return new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onerror=reject; fr.onload=()=>{ const img=new Image(); img.onerror=reject; img.onload=()=>{ let w=img.width,h=img.height; if(w>h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; } else if(h>=w && h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; } const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); resolve(c.toDataURL('image/jpeg',quality)); }; img.src=fr.result; }; fr.readAsDataURL(file); }); }
+screen.addEventListener('change',async e=>{
   if(e.target.id==='discIn'){ applyDiscount(parseInt((e.target.value||'').replace(/\D/g,''))||0); render(); }
   const setv=e.target.closest('[data-setval]'); if(setv){ const key=setv.dataset.setval, val=setv.value; SETTINGS[key]=val; api('/api/settings','PATCH',{[key]:val}).then(r=>{ if(r.shop) SETTINGS=r.shop; toast('Saved'); }).catch(()=>toast('Could not save',true)); }
   // picking a line from the sale prefills the refund amount with that line's price
   if(e.target.id==='ret-item'&&e.target.tagName==='SELECT'){ const opt=e.target.selectedOptions[0]; const amt=document.getElementById('ret-amt'); if(opt&&amt) amt.value=opt.dataset.price||''; }
+  // category dropdown: show the "new category" box when + New category is picked
+  if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
+  // product photo: downscale, upload, then show a preview and fill the image link
+  if(e.target.id==='np-imgfile'){ const f=e.target.files&&e.target.files[0]; if(!f) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
+    try{ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); const img=document.getElementById('np-image'); if(img) img.value=r.url; const pv=document.getElementById('np-imgpreview'); if(pv){ pv.src=r.url; pv.style.display=''; } if(st){ st.textContent='Photo added'; st.style.color='var(--mpesa)'; } }
+    catch(err){ if(st){ st.textContent='Could not upload that photo'; st.style.color='var(--stop)'; } }
+  }
 });
 // Enter inside the discount field applies it straight away
 screen.addEventListener('keydown',e=>{

@@ -4,3 +4,4 @@ pos.db-shm
 published/
 node_modules/
 mail.json
+uploads/

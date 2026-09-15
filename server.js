@@ -55,6 +55,12 @@ const HTML_FILE = [
   path.join(__dirname, '..', 'babyshop-pos-friendly.html'),
 ].find(f => fs.existsSync(f)) || path.join(__dirname, 'babyshop-pos-friendly.html');
 
+// Uploaded product photos live here (served at /uploads/..., kept out of git like pos.db).
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
+const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+const EXT_MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+
 // method code -> label used by the front end (matches the prototype)
 const METHOD_LABEL = { mpesa: 'M-PESA', card: 'Card', cash: 'Cash', split: 'Split payment' };
 
@@ -437,7 +443,7 @@ function sendJSON(res, code, obj) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', c => { data += c; if (data.length > 5e6) req.destroy(); });
+    req.on('data', c => { data += c; if (data.length > 8e6) req.destroy(); });
     req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } });
     req.on('error', reject);
   });
@@ -464,6 +470,21 @@ const server = http.createServer(async (req, res) => {
         delivery: del.delivery,
         expenses: allExpenses(),
       });
+    }
+
+    // Upload a product photo (sent as a data URL). Saves a file and returns its URL.
+    if (p === '/api/upload' && method === 'POST') {
+      const body = await readBody(req);
+      const m = String(body.data || '').match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+      if (!m) return sendJSON(res, 400, { error: 'Not a valid image' });
+      const ext = MIME_EXT[m[1].toLowerCase()];
+      if (!ext) return sendJSON(res, 400, { error: 'Unsupported image type' });
+      const buf = Buffer.from(m[2], 'base64');
+      if (buf.length > 6e6) return sendJSON(res, 400, { error: 'Image is too large' });
+      const name = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + '.' + ext;
+      fs.writeFileSync(path.join(UPLOAD_DIR, name), buf);
+      // protocol-relative URL so it works on the POS and the shop website (both https in production)
+      return sendJSON(res, 200, { url: '//' + (req.headers.host || 'localhost') + '/uploads/' + name });
     }
 
     // Returns and swaps.
@@ -696,6 +717,16 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p.startsWith('/api/')) return sendJSON(res, 404, { error: 'not found' });
+
+    // ---- static: uploaded product photos ----
+    if (p.startsWith('/uploads/') && method === 'GET') {
+      const name = path.basename(decodeURIComponent(p.slice('/uploads/'.length)));  // basename blocks path traversal
+      const file = path.join(UPLOAD_DIR, name);
+      if (!name || !fs.existsSync(file)) { res.writeHead(404); return res.end('Not found'); }
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      res.writeHead(200, { 'Content-Type': EXT_MIME[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': '*' });
+      return res.end(fs.readFileSync(file));
+    }
 
     // ---- static: the prototype HTML ----
     if ((p === '/' || p === '/index.html' || p === '/babyshop-pos-friendly.html') && method === 'GET') {
