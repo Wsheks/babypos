@@ -83,7 +83,7 @@ function productOut(r) {
            category: r.category || '', kind: r.kind || '',
            ageMin: r.age_min, ageMax: r.age_max,
            sizes: safeArr(r.sizes), colours: safeArr(r.colours),
-           wasPrice: r.was_price || null, image: r.image || '',
+           wasPrice: r.was_price || null, image: r.image || '', images: safeArr(r.images),
            online: r.online == null ? 1 : r.online, featured: r.featured ? 1 : 0 };
 }
 function safeArr(s) { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
@@ -383,6 +383,7 @@ function buildCatalogue() {
       colours: colours.length ? colours : ['teal'],
       tags: r.featured ? ['featured'] : [],
       image: r.image || '',
+      images: (() => { const g = safeArr(r.images); return g.length ? g : (r.image ? [r.image] : []); })(),
     };
     if (r.was_price && r.was_price > r.selling_price) item.wasPrice = r.was_price;
     return item;
@@ -397,14 +398,16 @@ function addProduct(body) {
   const kind = (body.kind && String(body.kind).trim()) || deriveKind(body.n);
   const sizes = Array.isArray(body.sizes) ? body.sizes : [];
   const colours = Array.isArray(body.colours) ? body.colours : [];
+  const images = Array.isArray(body.images) ? body.images.filter(Boolean) : [];
+  const mainImage = body.image || images[0] || null;
   const id = db.prepare(
     `INSERT INTO products (name, age_range, category, cost_price, selling_price, wholesale_price, stock_qty, sku, barcode, received, created_at, vat_type,
-       kind, age_min, age_max, sizes, colours, was_price, image, online, featured)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'today', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       kind, age_min, age_max, sizes, colours, was_price, image, images, online, featured)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'today', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(body.n, body.a || 'All ages', body.category || null, Number(body.c) || 0, Number(body.p) || 0, Number(body.w) || 0, Number(body.s) || 0,
         sku, null, now(), vatType,
         kind, ages.min, ages.max, JSON.stringify(sizes), JSON.stringify(colours),
-        Number(body.was_price) || null, body.image || null,
+        Number(body.was_price) || null, mainImage, JSON.stringify(images),
         body.online === false || body.online === 0 ? 0 : 1, body.featured ? 1 : 0).lastInsertRowid;
   // give it a barcode in the prototype's style, and a tidy auto SKU if none was supplied
   const bc = '629' + String(1041500 + (id * 137)).slice(-7);
@@ -692,6 +695,7 @@ const server = http.createServer(async (req, res) => {
       if (body.colours !== undefined) set('colours', JSON.stringify(Array.isArray(body.colours) ? body.colours : []));
       if (body.was_price !== undefined) set('was_price', Number(body.was_price) || null);
       if (body.image !== undefined) set('image', body.image || null);
+      if (body.images !== undefined) { const arr = Array.isArray(body.images) ? body.images.filter(Boolean) : []; set('images', JSON.stringify(arr)); set('image', arr[0] || null); }
       if (body.online !== undefined) set('online', (body.online === true || body.online === 1 || body.online === '1') ? 1 : 0);
       if (body.featured !== undefined) set('featured', (body.featured === true || body.featured === 1 || body.featured === '1') ? 1 : 0);
       return sendJSON(res, 200, { product: productOut(db.prepare('SELECT * FROM products WHERE id = ?').get(prod.id)) });

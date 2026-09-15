@@ -209,6 +209,7 @@ ensureColumn('products', 'sizes', 'TEXT');
 ensureColumn('products', 'colours', 'TEXT');
 ensureColumn('products', 'was_price', 'INTEGER');
 ensureColumn('products', 'image', 'TEXT');
+ensureColumn('products', 'images', 'TEXT');  // JSON array of photo URLs (gallery); image = the first/main one
 ensureColumn('products', 'online', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('products', 'featured', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('products', 'wholesale_price', 'INTEGER NOT NULL DEFAULT 0');  // bulk/reseller price

@@ -640,6 +640,8 @@ function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'
 // A password box with a Show/Hide eye button.
 function pwInput(id){ return `<div class="pw-wrap"><input id="${id}" type="password" autocomplete="off" autocapitalize="none"><button type="button" class="pw-eye" data-eye="${id}">Show</button></div>`; }
 const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
+// a product's photo (first of its gallery) for cards, or the placeholder icon
+const prodPic = p => (p && (p.image || (p.images&&p.images[0])) ? `<img src="${p.image || p.images[0]}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : babyIcon);
 
 let PRODUCTS = [];   // loaded from the backend in boot()
 let CART = [];       // the sale in progress starts empty
@@ -667,6 +669,8 @@ let RETURNS = [];    // loaded in boot()
 let TXNS = [];       // today's sales, loaded in boot()
 let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1, editPrice=null, newReturnOpen=false, returnFromSale=null;
 let sellSearch='', stockSearch='';   // live product filters on the Sell and Stock screens
+let npImages=[];                     // photos being added on the new-product form
+let editPhotos=null, editPhotosList=[]; // managing an existing product's photo gallery
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
 const ROLES = [
@@ -882,7 +886,7 @@ function sell(){
       </div>
       <div class="products">
         ${(()=>{ const q=sellSearch.trim().toLowerCase(); const cards=PRODUCTS.map((p,i)=> (q && !(`${p.n} ${p.a||''} ${p.sku||''} ${p.category||''}`).toLowerCase().includes(q)) ? '' : `<button class="pcard" data-add="${i}">
-          <div class="pic">${babyIcon}</div>
+          <div class="pic">${prodPic(p)}</div>
           <div class="nm">${p.n}</div>
           <div class="age">${p.a}</div>
           <div class="foot">
@@ -1142,6 +1146,14 @@ function deliveriesPanel(){
     <span style="color:var(--mut);font-size:13px;font-weight:600">Accepting adds every counted piece to the Products list. Prices come from your import calculator and round up to the nearest hundred.</span>
   </div>`;
 }
+function photosModal(){ const pr=PRODUCTS.find(x=>x.id===editPhotos); if(!pr) return '';
+  return `<div class="npmodal" data-photobg><div class="np-form" style="max-width:560px">
+    <div class="pt" style="padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><h3>Photos — ${pr.n}</h3><button class="btn sm" data-photoclose style="padding:6px 11px">✕</button></div>
+    <div id="ep-imglist" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${editPhotosList.length?editPhotosList.map((u,i)=>`<div style="position:relative;width:74px;height:74px"><img src="${u}" style="width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-epimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button>${i===0?'<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:800;text-align:center;border-radius:0 0 10px 10px">MAIN</span>':''}</div>`).join(''):'<span style="color:var(--mut);font-weight:600">No photos yet. Add some below.</span>'}</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload photos<input id="ep-imgfile" type="file" accept="image/*" multiple style="display:none"></label><span id="ep-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">The first photo is the main one on the card.</span></div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn green" data-photosave>Save photos</button><button class="btn" data-photoclose>Cancel</button></div>
+  </div></div>`;
+}
 function productsPanel(){
   const units=PRODUCTS.reduce((t,p)=>t+p.s,0);
   const low=PRODUCTS.filter(p=>p.s<5).length;
@@ -1175,13 +1187,12 @@ function productsPanel(){
         ${(()=>{ const base=['Clothing Sets','Dresses & Skirts','Rompers & Onesies','Jackets & Sweaters','Tops & Bottoms','Hats, Socks & Accessories','Shoes','Feeding & Weaning','Bath & Changing','Nursery & Gear','Blankets & Bedding','Mum Care','Toys']; const cats=[...new Set([...PRODUCTS.map(p=>p.category).filter(Boolean),...base])].sort(); return `<select id="np-category" class="sel" style="width:100%;padding:12px 14px">${cats.map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select>`; })()}
         <input id="np-category-new" placeholder="Type the new category name" style="margin-top:8px;display:none"></div>
       <div class="field"><label>Was price (KSh, optional)</label><input id="np-was" placeholder="for a Save badge" inputmode="numeric"></div>
-      <div class="field" style="grid-column:1 / -1"><label>Item photo (optional)</label>
+      <div class="field" style="grid-column:1 / -1"><label>Item photos (optional)</label>
+        <div id="np-imglist" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join('')}</div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <img id="np-imgpreview" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2);display:none">
-          <label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload a photo<input id="np-imgfile" type="file" accept="image/*" style="display:none"></label>
-          <span id="np-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">Take a picture or choose from the device</span>
-        </div>
-        <input id="np-image" placeholder="…or paste an image link" style="margin-top:8px"></div>
+          <label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload photos<input id="np-imgfile" type="file" accept="image/*" multiple style="display:none"></label>
+          <span id="np-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">Add one or more. The first photo is the main one shown on the card.</span>
+        </div></div>
       <div class="field" style="grid-column:1 / -1"><label>Colours shown online</label><div id="np-colours" style="display:flex;flex-wrap:wrap;gap:8px">${Object.entries(WEB_PALETTE).map(([k,hex])=>`<label style="display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line2);border-radius:999px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--ink2);cursor:pointer"><input type="checkbox" value="${k}"><span style="width:13px;height:13px;border-radius:50%;background:${hex};display:inline-block"></span>${k}</label>`).join('')}</div></div>
       <div class="field" style="grid-column:1 / -1;flex-direction:row;align-items:center;gap:20px;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-online" checked> Sell this on the website</label><label style="display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;cursor:pointer"><input type="checkbox" id="np-featured"> Feature it (Picked for you)</label></div>
     </div>
@@ -1202,12 +1213,13 @@ function productsPanel(){
     ${can(4)?`<button class="btn sun" data-addprod><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a product</button>`:`<span style="color:var(--mut);font-size:13px;font-weight:600">Ask a manager to add products or change prices</span>`}
   </div>
   ${form}
+  ${editPhotos!=null?photosModal():''}
   <div class="panel">
     <div class="pt"><h3>${stockFilter==='low'?'Running low':'All products'}</h3><span class="badge">${stockFilter==='low'?shownProds.length+' to reorder':'Everything in the system'}</span>${stockFilter?`<button class="btn sm" data-stockfilter="all" style="margin-left:10px">Show all</button>`:''}</div>
     <div class="list">
       ${shownProds.length===0?`<div style="text-align:center;color:var(--mut);padding:34px 16px;font-weight:600">${sq?`No products match "${stockSearch}".`:'Nothing running low right now.'}</div>`:''}
       ${shownProds.map(pr=>`<div class="item-row">
-        <div class="thumb">${babyIcon}</div>
+        <div class="thumb">${prodPic(pr)}</div>
         <div>
           <div class="ir-nm">${pr.n}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
@@ -1215,7 +1227,7 @@ function productsPanel(){
         <div class="ir-right">
           <div style="text-align:right"><div style="font-weight:800">KSh ${money(pr.p)}</div>${can(7)?`<div class="ir-sub">cost ${money(pr.c)} · ${marg(pr)}% margin${pr.w?` · wholesale ${money(pr.w)}`:''}</div>`:`<div class="ir-sub">${pr.s} in stock</div>`}</div>
           <span class="pill ${pr.s<5?'warn':'ok'}">${pr.s} in stock</span>
-          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodedit="${pr.id}" style="padding:5px 8px;font-size:12px">Edit prices</button><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button><button class="btn ghost sm" data-prodlabel="${pr.id}" style="padding:5px 4px;font-size:12px">Print labels</button></div>`:''}
+          ${can(4)?`<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-prodedit="${pr.id}" style="padding:5px 8px;font-size:12px">Edit prices</button><button class="btn ghost sm" data-prodphotos="${pr.id}" style="padding:5px 8px;font-size:12px">Photos${(pr.images&&pr.images.length)?` (${pr.images.length})`:''}</button><button class="btn ghost sm" data-prodonline="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.online===0?'Put on website':'Take off website'}</button><button class="btn ghost sm" data-prodvat="${pr.id}" style="padding:5px 4px;font-size:12px">${pr.vt==='exempt'?'Make standard VAT':'Mark VAT exempt'}</button><button class="btn ghost sm" data-prodlabel="${pr.id}" style="padding:5px 4px;font-size:12px">Print labels</button></div>`:''}
         </div>
       </div>${(can(4)&&editPrice===pr.id)?`<div class="price-edit">
         <div class="pe-fld"><label>Selling price (KSh)</label><input id="ep-p-${pr.id}" inputmode="numeric" value="${pr.p||''}"></div>
@@ -1836,7 +1848,13 @@ screen.addEventListener('click',async e=>{
   // stock: products / deliveries / add product / accept delivery
   const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
   const sfl=e.target.closest('[data-stockfilter]'); if(sfl){ const f=sfl.dataset.stockfilter; stockFilter=(f==='all'||stockFilter===f)?null:f; render(); return; }
-  const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; render(); const nm=document.getElementById('np-name'); if(nm) nm.focus(); return; }
+  const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; npImages=[]; render(); const nm=document.getElementById('np-name'); if(nm) nm.focus(); return; }
+  const npdel=e.target.closest('[data-npimgdel]'); if(npdel){ npImages.splice(+npdel.dataset.npimgdel,1); const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); return; }
+  const pphotos=e.target.closest('[data-prodphotos]'); if(pphotos){ const pr=PRODUCTS.find(x=>x.id===+pphotos.dataset.prodphotos); editPhotos=pr?pr.id:null; editPhotosList=pr?((pr.images&&pr.images.length)?[...pr.images]:(pr.image?[pr.image]:[])):[]; render(); return; }
+  const epdel=e.target.closest('[data-epimgdel]'); if(epdel){ editPhotosList.splice(+epdel.dataset.epimgdel,1); render(); return; }
+  const pclose=e.target.closest('[data-photoclose]'); if(pclose){ editPhotos=null; editPhotosList=[]; render(); return; }
+  const pbg=e.target.closest('[data-photobg]'); if(pbg && e.target===pbg){ editPhotos=null; editPhotosList=[]; render(); return; }
+  const phsave=e.target.closest('[data-photosave]'); if(phsave){ const id=editPhotos; try{ const r=await api('/api/products/'+id,'PATCH',{images:editPhotosList}); const pr=PRODUCTS.find(x=>x.id===id); if(r.product&&pr) Object.assign(pr,r.product); editPhotos=null; editPhotosList=[]; toast('Photos saved'); }catch(err){ toast('Could not save the photos',true); } render(); return; }
   const npbg=e.target.closest('[data-modalbg]'); if(npbg && e.target===npbg){ addingProduct=false; render(); return; }
   const cancp=e.target.closest('[data-cancelprod]'); if(cancp){ addingProduct=false; render(); return; }
   const apre=e.target.closest('[data-agepreset]'); if(apre){ const v=apre.dataset.agepreset; const gf=document.getElementById('np-agefrom'),gt=document.getElementById('np-ageto'),gu=document.getElementById('np-ageunit'); if(v==='All ages'){ if(gf)gf.value=''; if(gt)gt.value=''; } else { const m=v.match(/(\d+)\s*-\s*(\d+)\s*(month|year)/i); if(m){ if(gf)gf.value=m[1]; if(gt)gt.value=m[2]; if(gu)gu.value=/month/i.test(m[3])?'Months':'Years'; } } return; }
@@ -1851,7 +1869,7 @@ screen.addEventListener('click',async e=>{
     const su=au.startsWith('month')?'m':'y';
     const sizes = (af&&at)?[`${af}-${at}${su}`]:(af||at)?[`${af||at}${su}`]:[];
     const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
-      category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
+      category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:npImages[0]||'', images:[...npImages],
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
     try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
     catch(err){ toast('Could not save the product',true); return; }
@@ -1976,9 +1994,14 @@ screen.addEventListener('change',async e=>{
   // category dropdown: show the "new category" box when + New category is picked
   if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
   // product photo: downscale, upload, then show a preview and fill the image link
-  if(e.target.id==='np-imgfile'){ const f=e.target.files&&e.target.files[0]; if(!f) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
-    try{ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); const img=document.getElementById('np-image'); if(img) img.value=r.url; const pv=document.getElementById('np-imgpreview'); if(pv){ pv.src=r.url; pv.style.display=''; } if(st){ st.textContent='Photo added'; st.style.color='var(--mpesa)'; } }
-    catch(err){ if(st){ st.textContent='Could not upload that photo'; st.style.color='var(--stop)'; } }
+  if(e.target.id==='np-imgfile'){ const files=[...(e.target.files||[])]; if(!files.length) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
+    try{ for(const f of files){ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); npImages.push(r.url); } const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); if(st){ st.textContent=npImages.length+' photo'+(npImages.length>1?'s':'')+' added'; st.style.color='var(--mpesa)'; } }
+    catch(err){ if(st){ st.textContent='Could not upload'; st.style.color='var(--stop)'; } }
+    e.target.value='';
+  }
+  if(e.target.id==='ep-imgfile'){ const files=[...(e.target.files||[])]; if(!files.length) return; const st=document.getElementById('ep-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
+    try{ for(const f of files){ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); editPhotosList.push(r.url); } render(); }
+    catch(err){ if(st){ st.textContent='Could not upload'; st.style.color='var(--stop)'; } }
   }
 });
 // Enter inside the discount field applies it straight away
