@@ -1216,7 +1216,7 @@ function productsPanel(){
 }
 function stock(){
   const head = stockTab==='products'
-    ? `<div class="phead"><h2>Products and stock</h2><p>Every item you sell lives here. This is where received deliveries land, and where you add something new to the shop.</p></div>`
+    ? ''
     : `<div class="phead"><h2>Deliveries</h2><p>Count a delivery as you open the cartons, then accept it. Accepted pieces go straight into your Products list. Anything short or damaged stays out until you decide.</p></div>`;
   return head + stockTabs() + (stockTab==='deliveries' ? deliveriesPanel() : productsPanel());
 }
