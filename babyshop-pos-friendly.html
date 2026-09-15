@@ -78,7 +78,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(140px,44vw,168px),1fr));gap:14px}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;text-align:left;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
-.pcard .pic{height:88px;border-radius:12px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
+.pcard .pic{position:relative;overflow:hidden;height:88px;border-radius:12px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
 .pcard .pic svg{width:34px;height:34px;opacity:.7}
 .pcard .nm{font-weight:800;font-size:14px;line-height:1.28}
 .pcard .age{font-size:12.5px;color:var(--mut);font-weight:600}
@@ -215,7 +215,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .price-edit input{width:120px;border:2px solid var(--line2);border-radius:10px;padding:9px 11px;font:inherit;font-weight:800;font-family:"Baloo 2";font-size:15px;background:#fff}
 .price-edit input:focus{border-color:var(--sun);outline:none}
 .item-row:last-child{border-bottom:0}
-.thumb{width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
+.thumb{position:relative;overflow:hidden;width:52px;height:52px;border-radius:13px;background:linear-gradient(150deg,#e3f1f5,#eaf5ee);display:grid;place-items:center;color:#9cc3cf}
 .thumb svg{width:24px;height:24px;opacity:.7}
 .ir-nm{font-weight:800;font-size:15px}
 .ir-sub{font-size:13px;color:var(--ink2);margin-top:2px;font-weight:600}
@@ -641,7 +641,7 @@ function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'
 function pwInput(id){ return `<div class="pw-wrap"><input id="${id}" type="password" autocomplete="off" autocapitalize="none"><button type="button" class="pw-eye" data-eye="${id}">Show</button></div>`; }
 const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
 // a product's photo (first of its gallery) for cards, or the placeholder icon
-const prodPic = p => (p && (p.image || (p.images&&p.images[0])) ? `<img src="${p.image || p.images[0]}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : babyIcon);
+const prodPic = p => (p && (p.image || (p.images&&p.images[0])) ? `<img src="${p.image || p.images[0]}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : babyIcon);
 
 let PRODUCTS = [];   // loaded from the backend in boot()
 let CART = [];       // the sale in progress starts empty
