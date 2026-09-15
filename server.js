@@ -103,7 +103,11 @@ function deriveAges(ageRange) {
   const t = (ageRange || '').toLowerCase();
   if (t.includes('newborn')) return { min: 0, max: 1 };
   const nums = (t.match(/\d+/g) || []).map(Number);
-  if (t.includes('month')) return { min: 0, max: 1 };
+  if (t.includes('month')) {  // convert months to whole years for the website age filter
+    if (nums.length >= 2) return { min: Math.floor(nums[0] / 12), max: Math.max(1, Math.ceil(nums[1] / 12)) };
+    if (nums.length === 1) return { min: 0, max: Math.max(1, Math.ceil(nums[0] / 12)) };
+    return { min: 0, max: 1 };
+  }
   if (nums.length >= 2) return { min: nums[0], max: nums[1] };
   if (nums.length === 1) return { min: nums[0], max: nums[0] };
   return { min: 0, max: 10 };

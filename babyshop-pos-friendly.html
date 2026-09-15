@@ -1151,9 +1151,19 @@ function productsPanel(){
     <div class="pt" style="padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><h3>Add a new product</h3><button class="btn sm" data-cancelprod aria-label="Close" style="padding:6px 11px">✕</button></div>
     <div class="np-grid">
       <div class="field" style="grid-column:1 / -1"><label>What is it called</label><input id="np-name" placeholder="e.g. Corduroy dungarees"></div>
-      <div class="field"><label>Age range</label>
-        ${(()=>{ const std=['0 to 3 months','3 to 6 months','6 to 12 months','1 to 2 years','2 to 3 years','3 to 4 years','4 to 5 years','5 to 6 years','6 to 8 years','8 to 10 years','All ages']; const extra=[...new Set(PRODUCTS.map(p=>p.a).filter(Boolean))].filter(a=>!std.includes(a)); return `<select id="np-age" class="sel" style="width:100%;padding:12px 14px">${[...std,...extra].map(a=>`<option${a==='All ages'?' selected':''}>${a}</option>`).join('')}<option value="__new__">+ Other age…</option></select>`; })()}
-        <input id="np-age-new" placeholder="Type the age range, e.g. 18 to 24 months" style="margin-top:8px;display:none"></div>
+      <div class="field" style="grid-column:1 / -1"><label>Age range</label>
+        <div id="np-agepresets" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">
+          ${['0-3 Months','6-24 Months','1-5 Years','6-8 Years','9-12 Years','13-16 Years'].map(a=>`<button type="button" class="chip" style="padding:7px 13px;font-size:12.5px" data-agepreset="${a}">${a}</button>`).join('')}
+          <button type="button" class="chip" style="padding:7px 13px;font-size:12.5px" data-agepreset="All ages">All ages</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:700;color:var(--ink2)">From</span>
+          <input id="np-agefrom" inputmode="numeric" placeholder="0" style="width:72px;text-align:center">
+          <span style="font-weight:700;color:var(--ink2)">to</span>
+          <input id="np-ageto" inputmode="numeric" placeholder="3" style="width:72px;text-align:center">
+          <select id="np-ageunit" class="sel" style="padding:11px 12px"><option>Months</option><option>Years</option></select>
+        </div>
+        <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:6px">Pick a range above, or type any range here (e.g. 6 to 18 months). Leave blank for "All ages".</div></div>
       <div class="field"><label>Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric"></div>
       <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
       <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
@@ -1828,13 +1838,15 @@ screen.addEventListener('click',async e=>{
   const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; render(); const nm=document.getElementById('np-name'); if(nm) nm.focus(); return; }
   const npbg=e.target.closest('[data-modalbg]'); if(npbg && e.target===npbg){ addingProduct=false; render(); return; }
   const cancp=e.target.closest('[data-cancelprod]'); if(cancp){ addingProduct=false; render(); return; }
+  const apre=e.target.closest('[data-agepreset]'); if(apre){ const v=apre.dataset.agepreset; const gf=document.getElementById('np-agefrom'),gt=document.getElementById('np-ageto'),gu=document.getElementById('np-ageunit'); if(v==='All ages'){ if(gf)gf.value=''; if(gt)gt.value=''; } else { const m=v.match(/(\d+)\s*-\s*(\d+)\s*(month|year)/i); if(m){ if(gf)gf.value=m[1]; if(gt)gt.value=m[2]; if(gu)gu.value=/month/i.test(m[3])?'Months':'Years'; } } return; }
   const savp=e.target.closest('[data-saveprod]'); if(savp){
     const g=id=>document.getElementById(id), val=id=>{const e=g(id);return e?e.value:'';}, num=v=>parseInt((v||'').replace(/\D/g,''))||0;
     const name=(g('np-name').value||'').trim(); if(!name){ g('np-name').focus(); return; }
     const colours=[...document.querySelectorAll('#np-colours input:checked')].map(c=>c.value);
     const sizes=(val('np-sizes')||'').split(',').map(s=>s.trim()).filter(Boolean);
     let category=val('np-category'); if(category==='__new__') category=(val('np-category-new')||'').trim();
-    let age=val('np-age'); if(age==='__new__') age=(val('np-age-new')||'').trim(); age=age||'All ages';
+    const af=(val('np-agefrom')||'').replace(/\D/g,''), at=(val('np-ageto')||'').replace(/\D/g,''), au=(val('np-ageunit')||'Months').toLowerCase();
+    const age = (af&&at)?`${af} to ${at} ${au}`:(af||at)?`${af||at} ${au}`:'All ages';
     const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:(val('np-image')||'').trim(),
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
@@ -1954,7 +1966,6 @@ screen.addEventListener('change',async e=>{
   if(e.target.id==='ret-item'&&e.target.tagName==='SELECT'){ const opt=e.target.selectedOptions[0]; const amt=document.getElementById('ret-amt'); if(opt&&amt) amt.value=opt.dataset.price||''; }
   // category dropdown: show the "new category" box when + New category is picked
   if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
-  if(e.target.id==='np-age'){ const nf=document.getElementById('np-age-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
   // product photo: downscale, upload, then show a preview and fill the image link
   if(e.target.id==='np-imgfile'){ const f=e.target.files&&e.target.files[0]; if(!f) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
     try{ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); const img=document.getElementById('np-image'); if(img) img.value=r.url; const pv=document.getElementById('np-imgpreview'); if(pv){ pv.src=r.url; pv.style.display=''; } if(st){ st.textContent='Photo added'; st.style.color='var(--mpesa)'; } }
