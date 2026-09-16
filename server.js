@@ -65,13 +65,12 @@ function sniffImageType(buf) {
   if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp';
   return null;
 }
-// Remove the background of an image via the remove.bg API and flatten onto white.
-// Input is base64 (no data: prefix); returns the processed image as a Buffer (PNG).
-function removeBgViaService({ b64, key }) {
+// One remove.bg call with a given detection type. Returns the processed image as a Buffer (PNG).
+// format=png keeps the output a real PNG (with bg_color the result is opaque; format=auto would
+// otherwise hand back JPEG bytes and cause a media-type mismatch downstream).
+function removeBgOnce({ b64, key, type }) {
   return new Promise((resolve, reject) => {
-    // type=product helps remove.bg find the item in flat-lay shots; format=png keeps the output a
-    // real PNG (with bg_color the result is opaque, and format=auto would hand back JPEG bytes).
-    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&type=product&bg_color=ffffff&format=png';
+    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&type=' + type + '&bg_color=ffffff&format=png';
     const req = https.request({
       hostname: 'api.remove.bg', path: '/v1.0/removebg', method: 'POST',
       headers: { 'X-Api-Key': key, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(form) },
@@ -89,6 +88,14 @@ function removeBgViaService({ b64, key }) {
     req.setTimeout(40000, () => { req.destroy(); reject(new Error('remove.bg took too long')); });
     req.on('error', reject);
     req.write(form); req.end();
+  });
+}
+// Product mode is best for a single clean item; if it can't find one, retry in auto mode, which
+// rescues some hand-held / busier shots. Failed detections don't consume remove.bg credits.
+function removeBgViaService({ b64, key }) {
+  return removeBgOnce({ b64, key, type: 'product' }).catch(err => {
+    if (/foreground/i.test(String((err && err.message) || ''))) return removeBgOnce({ b64, key, type: 'auto' });
+    throw err;
   });
 }
 // Tidy the model's reply into a clean product title.
