@@ -833,7 +833,7 @@ function orders(){
   const inFilter=o=> !orderFilter ? true : (orderFilter==='await' ? o.pay==='await' : o.st===orderFilter);
   const shownCount=ORDERS.filter(inFilter).length;
   const activeCard=cards.find(c=>c[0]===orderFilter);
-  return `<div class="phead"><h2>Online orders</h2><p>Orders from WhatsApp land here. Pack them, hand them to a rider, and mark them delivered. Paid orders take the item off the shelf automatically.</p></div>
+  return `<div class="phead"><h2>Online orders</h2></div>
   <div class="stats">
     ${cards.map(c=>`<button class="stat stat-btn ${orderFilter===c[0]?'on':''}" data-ordfilter="${c[0]}"><div class="l">${c[1]}</div><div class="v num">${c[2]}</div></button>`).join('')}
   </div>
@@ -1245,7 +1245,7 @@ function productsPanel(){
 function stock(){
   const head = stockTab==='products'
     ? ''
-    : `<div class="phead"><h2>Deliveries</h2><p>Count a delivery as you open the cartons, then accept it. Accepted pieces go straight into your Products list. Anything short or damaged stays out until you decide.</p></div>`;
+    : `<div class="phead"><h2>Deliveries</h2></div>`;
   return head + stockTabs() + (stockTab==='deliveries' ? deliveriesPanel() : productsPanel());
 }
 
@@ -1259,7 +1259,7 @@ function returns(){
   const reasons={}; RETURNS.forEach(r=>{ if(r.why) reasons[r.why]=(reasons[r.why]||0)+1; });
   const topReason=Object.entries(reasons).sort((a,b)=>b[1]-a[1])[0];
   const REASONS=['Wrong size','Changed their mind','Faulty item','Wrong item given','Other'];
-  return `<div class="phead"><h2>Returns and swaps</h2><p>Most returns here are just a size. We swap first, and only refund when there is nothing to swap into. Within 14 days with a receipt.</p></div>
+  return `<div class="phead"><h2>Returns and swaps</h2></div>
   <div class="stats">
     <div class="stat"><div class="l">This month</div><div class="v num">${monthN}</div></div>
     <div class="stat"><div class="l">Swapped</div><div class="v num">${swapped}</div></div>
@@ -1402,7 +1402,7 @@ function settings(){
     </div>`;
   }
   if(setTab==='devices'){ body = devicesBody(); }
-  return `<div class="phead"><h2>Settings</h2><p>Everything about how the shop runs, in one place. You can change any of this from your phone when you are not in Utawala.</p></div>
+  return `<div class="phead"><h2>Settings</h2></div>
   <div class="set-grid">
     <div class="set-nav">
       ${tabs.map(t=>`<button class="${t[0]===setTab?'on':''}" data-set="${t[0]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${t[2]}</svg>${t[1]}</button>`).join('')}
@@ -1442,7 +1442,7 @@ function reports(){
   const lowNow=PRODUCTS.filter(p=>p.s<5).length;   // items at/under the reorder line
   const mpill={'M-PESA':'mpesa','Card':'card','Cash':'cash'};
   const ranges=[['today','Today'],['yesterday','Yesterday'],['week','Last 7 days']];
-  return `<div class="phead"><h2>Sales and reports</h2><p>Everything you have taken and every sale that went through. Tap a sale to see what was in it and print the receipt again.</p></div>
+  return `<div class="phead"><h2>Sales and reports</h2></div>
   <div class="chips" style="margin-bottom:16px">${ranges.map(r=>`<button class="chip ${repRange===r[0]?'on':''}" data-range="${r[0]}">${r[1]}</button>`).join('')}</div>
   <div class="stats">
     <div class="stat"><div class="l">Money taken</div><div class="v num">${money(total)}</div></div>
@@ -1511,7 +1511,7 @@ function expenses(){
   const totalExp=sum(EXPENSES);
   const todayExp=sum(EXPENSES.filter(x=>(x.on||'').slice(0,10)===today));
   const monthExp=sum(EXPENSES.filter(x=>(x.on||'').slice(0,7)===month));
-  return `<div class="phead"><h2>Expenses</h2><p>Record what the shop spends, like rent, salaries, transport and restocking. These are taken off your profit in Reports.</p></div>
+  return `<div class="phead"><h2>Expenses</h2></div>
   <div class="stats">
     <div class="stat"><div class="l">Spent today</div><div class="v num">${money(todayExp)}</div></div>
     <div class="stat"><div class="l">This month</div><div class="v num">${money(monthExp)}</div></div>
