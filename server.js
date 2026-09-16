@@ -161,6 +161,18 @@ function cashupOut(r) {
 function allCashups() {
   return db.prepare('SELECT * FROM cash_ups ORDER BY id DESC LIMIT 30').all().map(cashupOut);
 }
+// --- stock movement / audit trail (for the Stock report) ---
+function allMovements(limit) {
+  const n = Math.min(Math.max(Number(limit) || 200, 1), 2000);
+  return db.prepare(
+    `SELECT m.*, p.name AS pname FROM stock_movements m
+     LEFT JOIN products p ON p.id = m.product_id
+     ORDER BY m.id DESC LIMIT ?`
+  ).all(n).map(r => ({
+    id: r.id, product: r.pname || (r.product_id ? ('#' + r.product_id) : 'Unknown'),
+    type: r.type, qty: r.qty, ref: r.ref, at: r.datetime, user: r.user || '',
+  }));
+}
 function addCashup(body) {
   const opening = Math.max(0, Math.round(Number(body.opening) || 0));
   const cashSales = Math.max(0, Math.round(Number(body.cashSales) || 0));
@@ -503,6 +515,11 @@ const server = http.createServer(async (req, res) => {
         expenses: allExpenses(),
         cashups: allCashups(),
       });
+    }
+
+    // Stock movement / audit trail for the Stock report (?limit=NNN, newest first).
+    if (p === '/api/movements' && method === 'GET') {
+      return sendJSON(res, 200, { movements: allMovements(url.searchParams.get('limit')) });
     }
 
     // Record an end-of-day cash count (the Z report). Returns the saved count + recent history.

@@ -670,6 +670,7 @@ let DELIVERY = null; // pending delivery header, loaded in boot()
 let RETURNS = [];    // loaded in boot()
 let TXNS = [];       // today's sales, loaded in boot()
 let stockTab='products', addingProduct=false, justReceived=0, repRange='today', openTxn=-1, editPrice=null, newReturnOpen=false, returnFromSale=null;
+let MOVEMENTS=[], movementsLoaded=false, stockRepDays=30;   // Stock report: audit trail + best/slow-seller window
 let sellSearch='', stockSearch='';   // live product filters on the Sell and Stock screens
 let npImages=[];                     // photos being added on the new-product form
 let editPhotos=null, editPhotosList=[]; // managing an existing product's photo gallery
@@ -1113,6 +1114,7 @@ function stockTabs(){
   return `<div class="chips" style="margin-bottom:18px">
     <button class="chip ${stockTab==='products'?'on':''}" data-stab="products">Products (${PRODUCTS.length})</button>
     <button class="chip ${stockTab==='deliveries'?'on':''}" data-stab="deliveries">Deliveries to accept (${DELIVERY?1:0})</button>
+    <button class="chip ${stockTab==='report'?'on':''}" data-stab="report">Stock report</button>
   </div>`;
 }
 function deliveriesPanel(){
@@ -1242,11 +1244,125 @@ function productsPanel(){
     </div>
   </div>`;
 }
+/* -------- STOCK REPORT: valuation, reorder, sell-through, audit trail -------- */
+function ymdStr(d){ const z=new Date(d); return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0'); }
+// Compute everything the stock report needs, once, from data already in the client.
+function stockReportData(){
+  const days=Number(stockRepDays)||30;
+  const sinceYmd=ymdStr(new Date(Date.now()-(days-1)*864e5));
+  const inRange=d=>d && d>=sinceYmd;
+  const units=PRODUCTS.reduce((t,p)=>t+p.s,0);
+  const costVal=PRODUCTS.reduce((t,p)=>t+p.s*(p.c||0),0);
+  const retailVal=PRODUCTS.reduce((t,p)=>t+p.s*(p.p||0),0);
+  const catMap={};
+  PRODUCTS.forEach(p=>{ const c=p.category||'Uncategorised'; const m=(catMap[c]=catMap[c]||{cat:c,lines:0,units:0,cost:0,retail:0}); m.lines++; m.units+=p.s; m.cost+=p.s*(p.c||0); m.retail+=p.s*(p.p||0); });
+  const cats=Object.values(catMap).sort((a,b)=>b.retail-a.retail);
+  const out=PRODUCTS.filter(p=>p.s<=0).sort((a,b)=>a.s-b.s);
+  const low=PRODUCTS.filter(p=>p.s>0&&p.s<5).sort((a,b)=>a.s-b.s);
+  // units sold per product name over the window (match sale line to product by the name before a comma)
+  const sold={};
+  TXNS.forEach(t=>{ if(!inRange(t.date)) return; (t.items||[]).forEach(it=>{ const k=String(it[0]||'').split(',')[0].trim().toLowerCase(); if(k) sold[k]=(sold[k]||0)+(it[1]||0); }); });
+  const withSold=PRODUCTS.map(p=>({p,sold:sold[p.n.toLowerCase()]||0}));
+  const best=withSold.filter(x=>x.sold>0).sort((a,b)=>b.sold-a.sold).slice(0,12);
+  const dead=withSold.filter(x=>x.sold===0&&x.p.s>0).sort((a,b)=>(b.p.s*(b.p.c||0))-(a.p.s*(a.p.c||0))).slice(0,15);
+  return {days,units,costVal,retailVal,cats,out,low,best,dead};
+}
+function stockReportPanel(){
+  const d=stockReportData();
+  const showCost=can(7);   // cost + profit only for owner/manager
+  const ranges=[[7,'7 days'],[30,'30 days'],[90,'90 days']];
+  const cap=(s,n)=>String(s||'').length>n?String(s).slice(0,n-1)+'…':String(s||'');
+  const li=(nm,right,warn)=>`<div class="set-row" style="padding:9px 20px"><div style="min-width:0"><div class="t" style="font-size:13.5px">${cap(nm,42)}</div></div><div class="val num" style="${warn?'color:var(--stop)':''}">${right}</div></div>`;
+  const mtypes={delivery:['Delivery','var(--mpesa)'],sale:['Sale','var(--ink2)'],return:['Return','var(--blue)'],adjust:['Adjust','var(--sun-d)']};
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn green sm" data-printstockreport><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-3a2 2 0 012-2h16a2 2 0 012 2v3a2 2 0 01-2 2h-2M6 14h12v7H6z"/></svg> Print this report</button></div>
+
+  <div class="stats">
+    <div class="stat"><div class="l">Pieces in stock</div><div class="v num">${money(d.units)}</div></div>
+    ${showCost?`<div class="stat"><div class="l">Value at cost</div><div class="v num">${money(d.costVal)}</div></div>`:''}
+    <div class="stat"><div class="l">Value at retail</div><div class="v num">${money(d.retailVal)}</div></div>
+    ${showCost?`<div class="stat"><div class="l">Profit if it all sells</div><div class="v num" style="color:var(--mpesa)">${money(d.retailVal-d.costVal)}</div></div>`:''}
+  </div>
+
+  <div class="panel" style="margin-top:16px"><div class="pt"><h3>Stock value by category</h3><span class="badge">${d.cats.length} categories</span></div>
+    ${d.cats.map(c=>`<div class="set-row" style="padding:10px 20px"><div><div class="t" style="font-size:13.5px">${cap(c.cat,34)}</div><div class="d">${c.lines} products · ${money(c.units)} pieces</div></div><div class="val num">${showCost?`<span style="color:var(--mut);font-weight:600;font-size:12.5px;margin-right:8px">cost ${money(c.cost)}</span>`:''}KSh ${money(c.retail)}</div></div>`).join('')}
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px">
+    <div class="panel"><div class="pt"><h3>Out of stock</h3><span class="badge" style="${d.out.length?'background:#fdecea;color:var(--stop)':''}">${d.out.length}</span></div>
+      ${d.out.length?d.out.slice(0,40).map(p=>li(p.n,'0 left',true)).join(''):'<div style="padding:20px;color:var(--mut);font-weight:600">Nothing is fully out of stock.</div>'}
+      ${d.out.length>40?`<div style="padding:10px 20px;color:var(--mut);font-weight:600;font-size:12.5px">and ${d.out.length-40} more</div>`:''}
+    </div>
+    <div class="panel"><div class="pt"><h3>Running low (reorder)</h3><span class="badge" style="${d.low.length?'background:#fff4e0;color:var(--sun-d)':''}">${d.low.length}</span></div>
+      ${d.low.length?d.low.slice(0,40).map(p=>li(p.n,p.s+' left')).join(''):'<div style="padding:20px;color:var(--mut);font-weight:600">Nothing is running low.</div>'}
+      ${d.low.length>40?`<div style="padding:10px 20px;color:var(--mut);font-weight:600;font-size:12.5px">and ${d.low.length-40} more</div>`:''}
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px"><div class="pt"><h3>Best and slow sellers</h3><div class="chips" style="margin:0">${ranges.map(r=>`<button class="chip sm ${stockRepDays===r[0]?'on':''}" data-stockrep="${r[0]}">${r[1]}</button>`).join('')}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0">
+      <div style="border-right:1px solid var(--line)"><div style="padding:10px 20px;font-weight:800;color:var(--mpesa)">Top sellers (last ${d.days} days)</div>
+        ${d.best.length?d.best.map(x=>li(x.p.n,x.sold+' sold')).join(''):'<div style="padding:16px 20px;color:var(--mut);font-weight:600">No sales in this window yet.</div>'}
+      </div>
+      <div><div style="padding:10px 20px;font-weight:800;color:var(--stop)">Not selling (in stock, 0 sold)</div>
+        ${d.dead.length?d.dead.map(x=>li(x.p.n,x.p.s+' left')).join(''):'<div style="padding:16px 20px;color:var(--mut);font-weight:600">Everything in stock has sold recently.</div>'}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px"><div class="pt"><h3>Stock movement trail</h3><span class="badge">${movementsLoaded?MOVEMENTS.length+' most recent':'loading…'}</span></div>
+    ${!movementsLoaded?'<div style="padding:20px;color:var(--mut);font-weight:600">Loading the movement history…</div>':(MOVEMENTS.length?`<div class="list">${MOVEMENTS.slice(0,60).map(m=>{ const mt=mtypes[m.type]||[m.type,'var(--ink2)']; const t=(m.at||'').slice(0,16).replace('T',' '); return `<div class="set-row" style="padding:9px 20px"><div style="min-width:0"><div class="t" style="font-size:13px">${cap(m.product,38)}</div><div class="d">${t}${m.user?' · '+m.user:''}${m.ref?' · '+m.ref:''}</div></div><div class="val" style="gap:8px"><span class="pill" style="background:${mt[1]}22;color:${mt[1]}">${mt[0]}</span><span class="num" style="font-weight:800;color:${m.qty<0?'var(--stop)':'var(--mpesa)'}">${m.qty>0?'+':''}${m.qty}</span></div></div>`; }).join('')}</div>`:'<div style="padding:20px;color:var(--mut);font-weight:600">No stock movements recorded yet.</div>')}
+  </div>`;
+}
 function stock(){
   const head = stockTab==='products'
     ? ''
-    : `<div class="phead"><h2>Deliveries</h2></div>`;
-  return head + stockTabs() + (stockTab==='deliveries' ? deliveriesPanel() : productsPanel());
+    : `<div class="phead"><h2>${stockTab==='report'?'Stock report':'Deliveries'}</h2></div>`;
+  const body = stockTab==='deliveries' ? deliveriesPanel() : (stockTab==='report' ? stockReportPanel() : productsPanel());
+  return head + stockTabs() + body;
+}
+// Pull the stock movement / audit trail on demand (only when the report is opened).
+async function loadMovements(){
+  try{ const r=await api('/api/movements?limit=400'); MOVEMENTS=r.movements||[]; }catch(e){ MOVEMENTS=[]; }
+  movementsLoaded=true; if(view==='stock'&&stockTab==='report') render();
+}
+// Print CSS for a full A4 document (stock report) — white page, black text, tables.
+function reportPrintCss(){ return `<style>@page{size:A4;margin:14mm}
+  body{font-family:'Nunito Sans',Arial,sans-serif;color:#111;font-size:12px;margin:0}
+  h1{font-size:18px;margin:0 0 2px} h2{font-size:13px;margin:16px 0 6px;border-bottom:1.5px solid #111;padding-bottom:3px}
+  .sub{color:#555;margin-bottom:10px;font-size:11px}
+  table{width:100%;border-collapse:collapse;margin-bottom:6px} th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;font-size:11px}
+  th{background:#f2f2f2}.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cards{display:flex;gap:10px;margin:8px 0 4px;flex-wrap:wrap}.card{border:1px solid #ccc;border-radius:6px;padding:8px 12px}.card .l{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.04em}.card .v{font-size:16px;font-weight:800}
+  .two{display:flex;gap:18px}.two>div{flex:1}
+</style>`; }
+// Build the printable stock report document from the same computed data as the on-screen panel.
+function stockReportDocHTML(){
+  const d=stockReportData(), showCost=can(7);
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const cap=(s,n)=>{s=esc(s);return s.length>n?s.slice(0,n-1)+'…':s;};
+  const list=(arr,fmt)=>arr.length?('<table>'+arr.map(fmt).join('')+'</table>'):'<div class=sub>None.</div>';
+  const rowsCat=d.cats.map(c=>`<tr><td>${cap(c.cat,30)}</td><td class=n>${c.lines}</td><td class=n>${money(c.units)}</td>${showCost?`<td class=n>${money(c.cost)}</td>`:''}<td class=n>${money(c.retail)}</td></tr>`).join('');
+  return `<h1>Stock report — ${esc(SHOP.name)}</h1>
+  <div class=sub>${esc(SHOP.branch)} · ${new Date().toLocaleString('en-GB')} · sell-through window ${d.days} days</div>
+  <div class=cards>
+    <div class=card><div class=l>Pieces in stock</div><div class=v>${money(d.units)}</div></div>
+    ${showCost?`<div class=card><div class=l>Value at cost</div><div class=v>KSh ${money(d.costVal)}</div></div>`:''}
+    <div class=card><div class=l>Value at retail</div><div class=v>KSh ${money(d.retailVal)}</div></div>
+    ${showCost?`<div class=card><div class=l>Profit if all sells</div><div class=v>KSh ${money(d.retailVal-d.costVal)}</div></div>`:''}
+  </div>
+  <h2>Stock value by category</h2>
+  <table><tr><th>Category</th><th class=n>Products</th><th class=n>Pieces</th>${showCost?'<th class=n>At cost</th>':''}<th class=n>At retail</th></tr>${rowsCat}</table>
+  <div class=two>
+    <div><h2>Out of stock (${d.out.length})</h2>${list(d.out.slice(0,60),p=>`<tr><td>${cap(p.n,34)}</td><td class=n>${esc(p.sku||'')}</td></tr>`)}</div>
+    <div><h2>Running low — reorder (${d.low.length})</h2>${list(d.low.slice(0,60),p=>`<tr><td>${cap(p.n,34)}</td><td class=n>${p.s} left</td></tr>`)}</div>
+  </div>
+  <div class=two>
+    <div><h2>Top sellers (${d.days}d)</h2>${list(d.best,x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.sold} sold</td></tr>`)}</div>
+    <div><h2>Not selling (in stock)</h2>${list(d.dead,x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.p.s} left</td></tr>`)}</div>
+  </div>
+  <h2>Recent stock movements</h2>
+  ${movementsLoaded&&MOVEMENTS.length?`<table><tr><th>Item</th><th>Type</th><th class=n>Qty</th><th>When</th><th>Who</th></tr>${MOVEMENTS.slice(0,80).map(m=>`<tr><td>${cap(m.product,30)}</td><td>${esc(m.type)}</td><td class=n>${m.qty>0?'+':''}${m.qty}</td><td>${esc((m.at||'').slice(0,16))}</td><td>${esc(m.user||'')}</td></tr>`).join('')}</table>`:'<div class=sub>Movement history not loaded.</div>'}
+  <div class=sub style="margin-top:14px">Prepared by ${esc(currentUser?currentUser.name:'')}</div>`;
 }
 
 /* -------- RETURNS -------- */
@@ -1914,7 +2030,9 @@ screen.addEventListener('click',async e=>{
   const rsw=e.target.closest('[data-retswap]'); if(rsw){ try{ const r=await api('/api/returns/'+rsw.dataset.retswap,'PATCH',{action:'swap',cashier:currentUser?currentUser.name:''}); RETURNS=r.returns; if(r.products)PRODUCTS=r.products; toast('Marked as swapped'); }catch(err){ toast('Could not update',true); } render(); window.scrollTo(0,0); return; }
 
   // stock: products / deliveries / add product / accept delivery
-  const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; render(); return; }
+  const stab=e.target.closest('[data-stab]'); if(stab){ stockTab=stab.dataset.stab; addingProduct=false; justReceived=0; if(stockTab==='report'&&!movementsLoaded) loadMovements(); render(); return; }
+  const srep=e.target.closest('[data-stockrep]'); if(srep){ stockRepDays=Number(srep.dataset.stockrep)||30; render(); return; }
+  const psr=e.target.closest('[data-printstockreport]'); if(psr){ printHTML('Stock report', stockReportDocHTML(), reportPrintCss()); toast('Stock report ready to print'); return; }
   const sfl=e.target.closest('[data-stockfilter]'); if(sfl){ const f=sfl.dataset.stockfilter; stockFilter=(f==='all'||stockFilter===f)?null:f; render(); return; }
   const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; npImages=[]; render(); const nm=document.getElementById('np-name'); if(nm) nm.focus(); return; }
   const npdel=e.target.closest('[data-npimgdel]'); if(npdel){ npImages.splice(+npdel.dataset.npimgdel,1); const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); return; }
