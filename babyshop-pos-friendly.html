@@ -315,7 +315,7 @@ h1,h2,h3,.baloo{font-family:"Baloo 2",Nunito,sans-serif;letter-spacing:-.01em}
 .paid-act{text-align:center}
 .paid-preview .receipt-scroll{max-height:66vh;overflow:auto;border-radius:12px}
 @media(max-width:820px){.paid-done{grid-template-columns:1fr}.paid-preview{order:2}.paid-preview .receipt-scroll{max-height:44vh}}
-/* on-screen receipt slip — same content and layout as what actually prints */
+/* on-screen receipt slip, same content and layout as what actually prints */
 .receipt-paper{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-width:300px;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;font-size:12.5px;font-weight:700;color:#111;line-height:1.4}
 .receipt-paper .tc{text-align:center}
 .receipt-paper .tb{font-weight:800}
@@ -1153,7 +1153,7 @@ function deliveriesPanel(){
 }
 function photosModal(){ const pr=PRODUCTS.find(x=>x.id===editPhotos); if(!pr) return '';
   return `<div class="npmodal" data-photobg><div class="np-form" style="max-width:560px">
-    <div class="pt" style="padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><h3>Photos — ${pr.n}</h3><button class="btn sm" data-photoclose style="padding:6px 11px">✕</button></div>
+    <div class="pt" style="padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><h3>Photos for ${pr.n}</h3><button class="btn sm" data-photoclose style="padding:6px 11px">✕</button></div>
     <div id="ep-imglist" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${editPhotosList.length?editPhotosList.map((u,i)=>`<div style="position:relative;width:74px;height:74px"><img src="${u}" style="width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-epimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button>${i===0?'<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:800;text-align:center;border-radius:0 0 10px 10px">MAIN</span>':''}</div>`).join(''):'<span style="color:var(--mut);font-weight:600">No photos yet. Add some below.</span>'}</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload photos<input id="ep-imgfile" type="file" accept="image/*" multiple style="display:none"></label><span id="ep-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">The first photo is the main one on the card.</span></div>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn green" data-photosave>Save photos</button><button class="btn" data-photoclose>Cancel</button></div>
@@ -1325,7 +1325,7 @@ async function loadMovements(){
   try{ const r=await api('/api/movements?limit=400'); MOVEMENTS=r.movements||[]; }catch(e){ MOVEMENTS=[]; }
   movementsLoaded=true; if(view==='stock'&&stockTab==='report') render();
 }
-// Print CSS for a full A4 document (stock report) — white page, black text, tables.
+// Print CSS for a full A4 document (stock report). White page, black text, tables.
 function reportPrintCss(){ return `<style>@page{size:A4;margin:14mm}
   body{font-family:'Nunito Sans',Arial,sans-serif;color:#111;font-size:12px;margin:0}
   h1{font-size:18px;margin:0 0 2px} h2{font-size:13px;margin:16px 0 6px;border-bottom:1.5px solid #111;padding-bottom:3px}
@@ -1342,7 +1342,7 @@ function stockReportDocHTML(){
   const cap=(s,n)=>{s=esc(s);return s.length>n?s.slice(0,n-1)+'…':s;};
   const list=(arr,fmt)=>arr.length?('<table>'+arr.map(fmt).join('')+'</table>'):'<div class=sub>None.</div>';
   const rowsCat=d.cats.map(c=>`<tr><td>${cap(c.cat,30)}</td><td class=n>${c.lines}</td><td class=n>${money(c.units)}</td>${showCost?`<td class=n>${money(c.cost)}</td>`:''}<td class=n>${money(c.retail)}</td></tr>`).join('');
-  return `<h1>Stock report — ${esc(SHOP.name)}</h1>
+  return `<h1>Stock report for ${esc(SHOP.name)}</h1>
   <div class=sub>${esc(SHOP.branch)} · ${new Date().toLocaleString('en-GB')} · sell-through window ${d.days} days</div>
   <div class=cards>
     <div class=card><div class=l>Pieces in stock</div><div class=v>${money(d.units)}</div></div>
@@ -1354,7 +1354,7 @@ function stockReportDocHTML(){
   <table><tr><th>Category</th><th class=n>Products</th><th class=n>Pieces</th>${showCost?'<th class=n>At cost</th>':''}<th class=n>At retail</th></tr>${rowsCat}</table>
   <div class=two>
     <div><h2>Out of stock (${d.out.length})</h2>${list(d.out.slice(0,60),p=>`<tr><td>${cap(p.n,34)}</td><td class=n>${esc(p.sku||'')}</td></tr>`)}</div>
-    <div><h2>Running low — reorder (${d.low.length})</h2>${list(d.low.slice(0,60),p=>`<tr><td>${cap(p.n,34)}</td><td class=n>${p.s} left</td></tr>`)}</div>
+    <div><h2>Running low, reorder (${d.low.length})</h2>${list(d.low.slice(0,60),p=>`<tr><td>${cap(p.n,34)}</td><td class=n>${p.s} left</td></tr>`)}</div>
   </div>
   <div class=two>
     <div><h2>Top sellers (${d.days}d)</h2>${list(d.best,x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.sold} sold</td></tr>`)}</div>
@@ -1386,7 +1386,7 @@ function returns(){
     <div class="pt"><h3>Recent returns</h3><span class="badge">${needYou?needYou+' need you':RETURNS.length+' total'}</span><button class="btn green sm" data-newreturn style="margin-left:auto">${newReturnOpen?'Close':'Record a return'}</button></div>
     ${newReturnOpen?(()=>{ const S=returnFromSale;
       const itemField=S
-        ? `<div class="fld"><label>Which item from the sale</label><select id="ret-item" class="sel" style="padding:12px 14px;width:100%">${S.items.map(it=>`<option value="${it[0]}" data-price="${it[2]}">${it[1]} × ${it[0]} — KSh ${money(it[2])}</option>`).join('')}</select></div>`
+        ? `<div class="fld"><label>Which item from the sale</label><select id="ret-item" class="sel" style="padding:12px 14px;width:100%">${S.items.map(it=>`<option value="${it[0]}" data-price="${it[2]}">${it[1]} × ${it[0]}, KSh ${money(it[2])}</option>`).join('')}</select></div>`
         : `<datalist id="prodnames">${PRODUCTS.slice(0,400).map(p=>`<option value="${p.n}">`).join('')}</datalist><div class="fld"><label>Item returned</label><input id="ret-item" list="prodnames" placeholder="Start typing the product"></div>`;
       return `<div style="padding:14px 18px;border-bottom:1px solid var(--line2);background:var(--paper)">
         ${S?`<div style="font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px"><span class="pill info">Sale ${S.ref}</span>${S.t||''} · paid by ${S.method}</div>`:''}
@@ -1410,7 +1410,7 @@ function returns(){
         </div>
         <div>
           <div class="ir-nm">${r.c||'Walk-in'}</div>
-          <div class="ir-sub">${r.item||'—'}${r.v?` · KSh ${money(r.v)}`:''}${r.ref?` · Sale ${r.ref}`:''}</div>
+          <div class="ir-sub">${r.item||'-'}${r.v?` · KSh ${money(r.v)}`:''}${r.ref?` · Sale ${r.ref}`:''}</div>
           <div class="ir-sub" style="color:var(--mut)">${r.why||''} · ${r.d||''}</div>
         </div>
         <div class="ir-right">
@@ -1675,7 +1675,7 @@ async function connectPrinter(which,method){ const d=DEVICES[which]; try{
   render();
 }
 // Open a print window with any HTML body (used for reprints and the Z report).
-// Print through a hidden frame so the print dialog opens directly — no pop-up window, no pop-up blocker.
+// Print through a hidden frame so the print dialog opens directly, with no pop-up window or blocker.
 function printHTML(title, body, css){
   const old=document.getElementById('printframe'); if(old) old.remove();
   const f=document.createElement('iframe'); f.id='printframe';
@@ -1775,7 +1775,7 @@ function zReportHTML(count){
       ${lowList.length?`<div style="border-top:1px dashed #000;margin:6px 0"></div>
       <div style="text-align:center;font-weight:800;margin:2px 0 4px">REORDER SOON (${lowList.length})</div>
       ${lowList.slice(0,15).map(p=>row(p.n.length>26?p.n.slice(0,25)+'…':p.n, p.s+' left')).join('')}
-      ${lowList.length>15?`<div style="text-align:center;font-size:11px">and ${lowList.length-15} more — see Stock</div>`:''}`:''}
+      ${lowList.length>15?`<div style="text-align:center;font-size:11px">and ${lowList.length-15} more, see Stock</div>`:''}`:''}
     </div>
     <div style="text-align:center;margin-top:12px;font-size:11px">Counted by ${(count&&count.cashier)||(currentUser?currentUser.name:'')}</div>
     <div style="text-align:center;font-size:11px">Signature ______________________</div>
@@ -1795,7 +1795,7 @@ function openCashup(){
   window.__cashup={float,cashSales,rlabel};
   const fld=(label,hint,id,val,ph)=>`<div style="margin-bottom:12px"><label style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">${label}</label>${hint?`<div style="color:var(--mut);font-size:12px;font-weight:600;margin-bottom:6px">${hint}</div>`:''}<input id="${id}" inputmode="numeric" value="${val!=null?val:''}" placeholder="${ph||'0'}" style="width:100%;padding:11px 13px;border:2px solid var(--line2);border-radius:11px;font:inherit;font-weight:800;font-size:16px"></div>`;
   m.innerHTML=`<div class="rcpt-wrap" style="max-width:420px">
-    <h3 style="margin-bottom:4px">Count the cash — ${rlabel}</h3>
+    <h3 style="margin-bottom:4px">Count the cash (${rlabel})</h3>
     <div style="color:var(--mut);font-size:12.5px;font-weight:600;margin-bottom:14px">Count everything in the drawer, then type the total. M-PESA and card do not go in the drawer.</div>
     <div style="background:#f5fbfc;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-weight:700;font-size:13.5px">
       <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Opening float</span><span class="num">KSh ${money(float)}</span></div>
@@ -1804,7 +1804,7 @@ function openCashup(){
     ${fld('Cash paid out of the till', 'Refunds or petty cash you took from the drawer'+(refundsTotal?'. Refunds today: KSh '+money(refundsTotal):''), 'cu-paidout', 0)}
     <div id="cu-expected" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:8px 2px;border-top:2px solid var(--line2);border-bottom:2px solid var(--line2);margin-bottom:14px"><span>Should be in the drawer</span><span class="num">KSh ${money(float+cashSales)}</span></div>
     ${fld('Cash you counted', 'The actual notes and coins in the drawer', 'cu-counted', '', 'Type the total')}
-    <div id="cu-var" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 2px;margin-bottom:6px;color:var(--mut)"><span>Over or short</span><span class="num">—</span></div>
+    <div id="cu-var" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 2px;margin-bottom:6px;color:var(--mut)"><span>Over or short</span><span class="num">-</span></div>
     <div style="display:flex;gap:9px;margin-top:14px"><button class="btn green" style="flex:1" data-hw="cashup-save">Save and print Z report</button><button class="btn" data-hw="close">Close</button></div>
   </div>`;
   window.__hwkind='cashup'; m.classList.add('show');
@@ -1812,7 +1812,7 @@ function openCashup(){
     const expected=float+cashSales-paid; window.__cashup.paidOut=paid; window.__cashup.expected=expected;
     const ee=document.getElementById('cu-expected'); if(ee) ee.querySelector('.num').textContent='KSh '+money(expected);
     const cv=(document.getElementById('cu-counted')||{}).value; const ve=document.getElementById('cu-var');
-    if(cv===''||cv==null){ if(ve){ ve.style.color='var(--mut)'; ve.querySelector('.num').textContent='—'; } return; }
+    if(cv===''||cv==null){ if(ve){ ve.style.color='var(--mut)'; ve.querySelector('.num').textContent='-'; } return; }
     const counted=Math.max(0,parseInt(cv,10)||0); const v=counted-expected;
     if(ve){ ve.style.color=v===0?'var(--mpesa)':(v>0?'var(--blue)':'var(--stop)'); ve.querySelector('.num').textContent=(v>0?'+ ':(v<0?'− ':''))+'KSh '+money(Math.abs(v))+(v===0?' · balanced':(v>0?' over':' short')); }
   };
@@ -1842,8 +1842,8 @@ function receiptHTML(t){ t=t||TXNS[0]; if(!t) return '<div style="padding:30px;t
         <div style="color:#98897d;font-weight:600;font-size:12px;margin-top:4px">${dateStr} · ${t.t}</div>
       </div>
       <div style="padding:13px 22px;${dot}">
-        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Receipt</span><span style="color:#3a322e">${t.ref||'—'}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Served by</span><span style="color:#3a322e">${t.cashier||'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Receipt</span><span style="color:#3a322e">${t.ref||'-'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Served by</span><span style="color:#3a322e">${t.cashier||'-'}</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#6f645b;padding:2px 0"><span>Customer</span><span style="color:#3a322e">${t.cust||'Walk-in'}</span></div>
       </div>
       <div style="padding:12px 22px;${dot}">
@@ -1885,7 +1885,7 @@ function labelHTML(){ const p=PRODUCTS[0]; if(!p) return '<div style="padding:20
 /* open the print-labels dialog for one product */
 function openLabelFor(id){ const p=PRODUCTS.find(x=>x.id===id)||PRODUCTS[0]; if(!p) return; window.__labelProd=p.id;
   const m=document.getElementById('hwmodal'); if(!m) return;
-  m.innerHTML=`<div class="rcpt-wrap"><h3 style="margin-bottom:12px">Print labels — ${p.n}</h3><div style="display:flex;justify-content:center;margin-bottom:14px">${labelSticker(p)}</div><div class="field"><label>How many stickers?</label><input id="lblcopies" type="number" min="1" value="${Math.max(1,p.s||1)}" inputmode="numeric" style="width:100%;padding:11px 13px;border:2px solid var(--line2);border-radius:11px;font:inherit;font-weight:700"></div><div style="display:flex;gap:9px;margin-top:16px"><button class="btn green" style="flex:1" data-hw="printlabels">Print</button><button class="btn" data-hw="close">Close</button></div></div>`;
+  m.innerHTML=`<div class="rcpt-wrap"><h3 style="margin-bottom:12px">Print labels for ${p.n}</h3><div style="display:flex;justify-content:center;margin-bottom:14px">${labelSticker(p)}</div><div class="field"><label>How many stickers?</label><input id="lblcopies" type="number" min="1" value="${Math.max(1,p.s||1)}" inputmode="numeric" style="width:100%;padding:11px 13px;border:2px solid var(--line2);border-radius:11px;font:inherit;font-weight:700"></div><div style="display:flex;gap:9px;margin-top:16px"><button class="btn green" style="flex:1" data-hw="printlabels">Print</button><button class="btn" data-hw="close">Close</button></div></div>`;
   window.__hwkind='label'; m.classList.add('show');
 }
 function openPrint(kind){ const m=document.getElementById('hwmodal'); if(!m) return; const inner=kind==='label'?labelHTML():receiptHTML();
@@ -2239,11 +2239,11 @@ document.getElementById('hwmodal').addEventListener('click',e=>{
     const nowStamp=(()=>{ const d=new Date(),z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); })();
     CASHUPS.unshift(Object.assign({at:nowStamp,range:s.rlabel||'Today'},count));
     api('/api/cashup','POST',{range:s.rlabel||'Today',opening:count.opening,cashSales:count.cashSales,paidOut,expected,counted,cashier:count.cashier})
-      .then(r=>{ if(r.cashups){ CASHUPS=r.cashups; render(); } }).catch(()=>toast('Saved on this device only — could not reach the server',true));
+      .then(r=>{ if(r.cashups){ CASHUPS=r.cashups; render(); } }).catch(()=>toast('Saved on this device only, could not reach the server',true));
     document.getElementById('hwmodal').classList.remove('show');
     printHTML('Z report', zReportHTML(count), receiptPrintCss());
     const vtxt=count.variance===0?'drawer balanced':(count.variance>0?('over by KSh '+money(count.variance)):('short by KSh '+money(Math.abs(count.variance))));
-    toast('Day counted — '+vtxt); render();
+    toast('Day counted, '+vtxt); render();
   }
 });
 // barcode scanner: keyboard wedge, and Enter inside a search or scan field
