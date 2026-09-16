@@ -60,7 +60,8 @@ function bgEnabled() { const c = aiConfig(); return !!(c && c.removebg_key); }
 // Input is base64 (no data: prefix); returns the processed image as a Buffer (PNG).
 function removeBgViaService({ b64, key }) {
   return new Promise((resolve, reject) => {
-    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&bg_color=ffffff';
+    // type=product helps remove.bg find the item in flat-lay clothing/object shots (auto often can't).
+    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&type=product&bg_color=ffffff';
     const req = https.request({
       hostname: 'api.remove.bg', path: '/v1.0/removebg', method: 'POST',
       headers: { 'X-Api-Key': key, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(form) },
