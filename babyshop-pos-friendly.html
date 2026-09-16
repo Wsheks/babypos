@@ -673,6 +673,7 @@ let stockTab='products', addingProduct=false, justReceived=0, repRange='today', 
 let MOVEMENTS=[], movementsLoaded=false, stockRepDays=30;   // Stock report: audit trail + best/slow-seller window
 let sellSearch='', stockSearch='';   // live product filters on the Sell and Stock screens
 let npImages=[];                     // photos being added on the new-product form
+let AI_TITLES=false, AI_MODEL='claude-haiku-4-5';   // AI product naming (set from the server if an API key is configured)
 let editPhotos=null, editPhotosList=[]; // managing an existing product's photo gallery
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
@@ -1168,7 +1169,12 @@ function productsPanel(){
   const form = addingProduct ? `<div class="npmodal" data-modalbg><div class="np-form">
     <div class="pt" style="padding:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><h3>Add a new product</h3><button class="btn sm" data-cancelprod aria-label="Close" style="padding:6px 11px">✕</button></div>
     <div class="np-grid">
-      <div class="field" style="grid-column:1 / -1"><label>What is it called</label><input id="np-name" placeholder="e.g. Corduroy dungarees"></div>
+      <div class="field" style="grid-column:1 / -1"><label>What is it called</label>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input id="np-name" placeholder="e.g. Corduroy dungarees" style="flex:1">
+          ${AI_TITLES?`<button type="button" class="btn sm" data-suggestname style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.8L18 9.5l-4.1 1.7L12 16l-1.9-4.8L6 9.5l4.1-1.7z"/></svg>Name from photo</button>`:''}
+        </div>
+        ${AI_TITLES?`<div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:5px">Upload a photo first, then let the till read it and suggest a name. You can edit it after.</div>`:''}</div>
       <div class="field" style="grid-column:1 / -1"><label>Age range</label>
         <div id="np-agepresets" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">
           ${['0-3 Months','6-24 Months','1-5 Years','6-8 Years','9-12 Years','13-16 Years'].map(a=>`<button type="button" class="chip" style="padding:7px 13px;font-size:12.5px" data-agepreset="${a}">${a}</button>`).join('')}
@@ -1515,7 +1521,16 @@ function settings(){
       <div class="set-row"><div><div class="t">Warn me when stock runs low</div><div class="d">At 5 pieces left, on WhatsApp to the owner.</div></div><div class="val">5 pieces<button class="switch ${setOn('warn_low_stock',true)?'on':''}" data-swkey="warn_low_stock"></button></div></div>
       <div class="set-row"><div><div class="t">Hold a reserved item for</div><div class="d">When a customer pays a deposit to hold something.</div></div><div class="val">7 days</div></div>
       <div class="set-row"><div><div class="t">Must count cash before closing</div><div class="d">The till will not open tomorrow until today is counted.</div></div><div class="val"><button class="switch ${setOn('must_count_cash',true)?'on':''}" data-swkey="must_count_cash"></button></div></div>
-    </div>`;
+    </div>
+    ${currentUser&&currentUser.role==='Owner'?`<div class="panel">
+      <div class="pt"><h3>AI product naming</h3>${AI_TITLES?'<span class="pill ok">On</span>':'<span class="pill warn">Off</span>'}</div>
+      <div style="padding:16px 20px">
+        ${AI_TITLES?`<div class="set-row" style="padding:0"><div><div class="t">Naming from photos is on</div><div class="d">On the Add product screen, upload a photo and tap "Name from photo" to get a suggested title you can edit. Model: ${AI_MODEL}.</div></div><div class="val"><button class="btn sm" data-aiclear style="color:var(--stop)">Remove key</button></div></div>`
+        :`<div class="d" style="margin-bottom:12px;line-height:1.6">Let the till look at a product photo and suggest a name, so you do not use supplier names. This needs an Anthropic API key. It is pay as you go, about half a cent or less per photo, billed separately from any Claude subscription. Create a key at console.anthropic.com, add a little credit, then paste it here.</div>
+        <div class="field" style="padding:0"><label>Anthropic API key</label><div style="display:flex;gap:8px"><input id="ai-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" style="flex:1;border:2px solid var(--line2);border-radius:11px;padding:11px 13px;font:inherit;font-weight:700"><button type="button" class="btn sm" data-eye="ai-key">Show</button></div></div>
+        <button class="btn green sm" data-aisave style="margin-top:12px">Save key and turn on</button>`}
+      </div>
+    </div>`:''}`;
   }
   if(setTab==='devices'){ body = devicesBody(); }
   return `<div class="phead"><h2>Settings</h2></div>
@@ -2035,6 +2050,18 @@ screen.addEventListener('click',async e=>{
   const psr=e.target.closest('[data-printstockreport]'); if(psr){ printHTML('Stock report', stockReportDocHTML(), reportPrintCss()); toast('Stock report ready to print'); return; }
   const sfl=e.target.closest('[data-stockfilter]'); if(sfl){ const f=sfl.dataset.stockfilter; stockFilter=(f==='all'||stockFilter===f)?null:f; render(); return; }
   const addp=e.target.closest('[data-addprod]'); if(addp){ addingProduct=true; npImages=[]; render(); const nm=document.getElementById('np-name'); if(nm) nm.focus(); return; }
+  const sug=e.target.closest('[data-suggestname]'); if(sug){
+    if(!npImages.length){ toast('Upload a photo first',true); return; }
+    let cat=(document.getElementById('np-category')||{}).value||''; if(cat==='__new__') cat=(document.getElementById('np-category-new')||{}).value||'';
+    const file=String(npImages[0]).split('/').pop();
+    const old=sug.innerHTML; sug.disabled=true; sug.textContent='Reading…';
+    try{
+      const r=await api('/api/suggest-title','POST',{imageFile:file,category:cat});
+      if(r&&r.ok&&r.title){ const el=document.getElementById('np-name'); if(el){ el.value=r.title; el.focus(); } toast('Suggested a name from the photo'); }
+      else { toast((r&&r.error)||'Could not suggest a name',true); }
+    }catch(err){ toast('Could not reach the AI naming service',true); }
+    sug.disabled=false; sug.innerHTML=old; return;
+  }
   const npdel=e.target.closest('[data-npimgdel]'); if(npdel){ npImages.splice(+npdel.dataset.npimgdel,1); const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); return; }
   const pphotos=e.target.closest('[data-prodphotos]'); if(pphotos){ const pr=PRODUCTS.find(x=>x.id===+pphotos.dataset.prodphotos); editPhotos=pr?pr.id:null; editPhotosList=pr?((pr.images&&pr.images.length)?[...pr.images]:(pr.image?[pr.image]:[])):[]; render(); return; }
   const epdel=e.target.closest('[data-epimgdel]'); if(epdel){ editPhotosList.splice(+epdel.dataset.epimgdel,1); render(); return; }
@@ -2135,6 +2162,8 @@ screen.addEventListener('click',async e=>{
   // channels: publish the catalogue to the website
   const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
   // settings: change my own password
+  const aisv=e.target.closest('[data-aisave]'); if(aisv){ const el=document.getElementById('ai-key'); const key=(el&&el.value||'').trim(); if(key.length<10){ toast('Paste your Anthropic API key first',true); if(el)el.focus(); return; } aisv.disabled=true; aisv.textContent='Saving…'; try{ const r=await api('/api/ai-config','POST',{key}); AI_TITLES=!!r.enabled; if(r.model)AI_MODEL=r.model; toast('AI naming is on'); }catch(err){ toast(err.message||'Could not save the key',true); } aisv.disabled=false; render(); return; }
+  const aicl=e.target.closest('[data-aiclear]'); if(aicl){ try{ await api('/api/ai-config','POST',{clear:true}); AI_TITLES=false; toast('AI naming turned off'); }catch(err){ toast(err.message||'Could not remove the key',true); } render(); return; }
   const cpw=e.target.closest('[data-changepw]'); if(cpw){ const cur=(document.getElementById('cpw-cur')||{}).value||''; const nw=(document.getElementById('cpw-new')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ await api('/api/password','POST',{username:currentUser.username,currentPassword:cur,newPassword:nw}); toast('Your password is changed'); }catch(err){ toast(err.message||'Could not change password',true); } return; }
   // settings: add a new staff member
   const sadd=e.target.closest('[data-staffadd]'); if(sadd){ staffAdd=true; staffPwEdit=null; staffDel=null; render(); return; }
@@ -2278,7 +2307,7 @@ async function refreshData(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY;
+    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY; AI_TITLES=!!d.aiTitles; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(e){}
 }
 async function boot(){
@@ -2287,7 +2316,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[];
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[]; AI_TITLES=!!d.aiTitles; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}

@@ -48,6 +48,66 @@ function sendMail({ key, from, to, subject, text }) {
   });
 }
 
+// AI product naming config lives in ai.json next to server.js (gitignored):
+//   {"key":"sk-ant-...","model":"claude-haiku-4-5"}
+// The owner pastes their own Anthropic API key in POS Settings, which writes this file.
+// Absent = the feature is simply off (the "Suggest from photo" button hides).
+function aiConfigPath() { return path.join(__dirname, 'ai.json'); }
+function aiConfig() { try { return JSON.parse(fs.readFileSync(aiConfigPath(), 'utf8')); } catch (e) { return null; } }
+function aiEnabled() { const c = aiConfig(); return !!(c && c.key); }
+// Tidy the model's reply into a clean product title.
+function cleanTitle(s) {
+  s = String(s || '').trim()
+    .replace(/^["'“‘\s]+/, '').replace(/["'”’.\s]+$/, '')
+    .replace(/\s+/g, ' ').trim();
+  if (s.length > 70) s = s.slice(0, 70).replace(/\s+\S*$/, '').trim();
+  return s;
+}
+// Ask a Claude vision model to name the outfit in a photo. Raw HTTPS, no npm deps
+// (same approach as sendMail). Returns the suggested title text.
+function suggestTitleFromImage({ base64, mediaType, category, cfg }) {
+  return new Promise((resolve, reject) => {
+    const model = (cfg && cfg.model) || 'claude-haiku-4-5';
+    const catLine = category ? ` The product is in the category "${String(category).slice(0, 40)}".` : '';
+    const prompt = `You are naming a product for a Kenyan baby and kids clothing shop's online store. Look at the outfit in this photo and write a short, clear product title a parent would understand, about 3 to 6 words. Name the garment (for example a 3-piece baby set, romper, dress, hooded jacket) and its main colour or pattern if you can see it.${catLine} Do not invent brand names. Ignore any price stickers, supplier codes or watermark text printed on the photo. Reply with only the title, with no quotes and no other words.`;
+    const payload = JSON.stringify({
+      model, max_tokens: 64,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: prompt },
+      ] }],
+    });
+    const req = https.request({
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: {
+        'x-api-key': cfg.key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(payload),
+      },
+    }, r => {
+      let buf = ''; r.setEncoding('utf8');
+      r.on('data', d => buf += d);
+      r.on('end', () => {
+        if (r.statusCode >= 200 && r.statusCode < 300) {
+          try {
+            const j = JSON.parse(buf);
+            const txt = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ');
+            resolve(txt);
+          } catch (e) { reject(new Error('Unexpected AI response')); }
+        } else {
+          let m = 'Anthropic ' + r.statusCode;
+          try { const e = JSON.parse(buf); if (e.error && e.error.message) m = e.error.message; } catch (_) {}
+          reject(new Error(m));
+        }
+      });
+    });
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('The AI took too long to answer')); });
+    req.on('error', reject);
+    req.write(payload); req.end();
+  });
+}
+
 const PORT = process.env.PORT || 4100;
 // Find the front-end file whether it sits next to server.js (flat deploy) or one level up (dev layout).
 const HTML_FILE = [
@@ -514,7 +574,51 @@ const server = http.createServer(async (req, res) => {
         delivery: del.delivery,
         expenses: allExpenses(),
         cashups: allCashups(),
+        aiTitles: aiEnabled(),
+        aiModel: (aiConfig() || {}).model || 'claude-haiku-4-5',
       });
+    }
+
+    // Owner saves (or clears) the Anthropic API key that powers AI product naming.
+    if (p === '/api/ai-config' && method === 'POST') {
+      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can set up AI naming' });
+      const body = await readBody(req);
+      if (body.clear) { try { fs.unlinkSync(aiConfigPath()); } catch (e) {} return sendJSON(res, 200, { enabled: false }); }
+      const key = String(body.key || '').trim();
+      if (key.length < 10) return sendJSON(res, 400, { error: 'That does not look like a valid API key' });
+      const model = String(body.model || '').trim() || 'claude-haiku-4-5';
+      fs.writeFileSync(aiConfigPath(), JSON.stringify({ key, model }, null, 2));
+      try { fs.chmodSync(aiConfigPath(), 0o600); } catch (e) {}
+      return sendJSON(res, 200, { enabled: true, model });
+    }
+
+    // Suggest a product title from an outfit photo (AI vision). Returns { ok, title } or { ok:false, error }.
+    if (p === '/api/suggest-title' && method === 'POST') {
+      const cfg = aiConfig();
+      if (!cfg || !cfg.key) return sendJSON(res, 200, { ok: false, notConfigured: true, error: 'AI naming is not set up yet' });
+      const body = await readBody(req);
+      let base64, mediaType;
+      if (body.imageFile) {
+        const name = path.basename(String(body.imageFile));
+        const file = path.join(UPLOAD_DIR, name);
+        if (!name || !fs.existsSync(file)) return sendJSON(res, 200, { ok: false, error: 'Could not find that photo on the server' });
+        const ext = (name.split('.').pop() || '').toLowerCase();
+        mediaType = EXT_MIME[ext] || 'image/jpeg';
+        base64 = fs.readFileSync(file).toString('base64');
+      } else if (body.image) {
+        const m = String(body.image).match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+        if (!m) return sendJSON(res, 200, { ok: false, error: 'Not a valid image' });
+        mediaType = m[1].toLowerCase(); base64 = m[2];
+      } else {
+        return sendJSON(res, 200, { ok: false, error: 'No photo to read' });
+      }
+      try {
+        const title = cleanTitle(await suggestTitleFromImage({ base64, mediaType, category: body.category, cfg }));
+        if (!title) return sendJSON(res, 200, { ok: false, error: 'The AI did not return a name' });
+        return sendJSON(res, 200, { ok: true, title });
+      } catch (err) {
+        return sendJSON(res, 200, { ok: false, error: String((err && err.message) || err).slice(0, 200) });
+      }
     }
 
     // Stock movement / audit trail for the Stock report (?limit=NNN, newest first).
