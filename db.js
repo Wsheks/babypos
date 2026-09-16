@@ -188,6 +188,19 @@ CREATE TABLE IF NOT EXISTS expenses (
   cashier     TEXT,
   created_at  TEXT
 );
+
+CREATE TABLE IF NOT EXISTS cash_ups (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  at         TEXT,                          -- when the count was done (local stamp)
+  for_range  TEXT,                          -- 'Today' | 'Yesterday' | 'Last 7 days'
+  cashier    TEXT,
+  opening    INTEGER NOT NULL DEFAULT 0,    -- opening float
+  cash_sales INTEGER NOT NULL DEFAULT 0,    -- cash taken in the range
+  paid_out   INTEGER NOT NULL DEFAULT 0,    -- cash paid out of the till (refunds, petty cash)
+  expected   INTEGER NOT NULL DEFAULT 0,    -- what should be in the drawer
+  counted    INTEGER NOT NULL DEFAULT 0,    -- what the owner actually counted
+  variance   INTEGER NOT NULL DEFAULT 0     -- counted - expected (negative = short)
+);
 `);
 
 // ---------------------------------------------------------------

@@ -637,6 +637,8 @@ let staffAdd = false;   // showing the "add someone" form
 let staffDel = null;    // which staff member's remove-confirm is showing
 // Is a saved on/off setting enabled? Falls back to a sensible default when never saved.
 function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'||v===1||v===true) : def; }
+// Opening float = the cash left in the drawer to start the day (set in Settings). Defaults to 3,000.
+function openingFloat(){ const v=Number(SETTINGS.opening_float); return Number.isFinite(v)&&v>=0 ? v : 3000; }
 // A password box with a Show/Hide eye button.
 function pwInput(id){ return `<div class="pw-wrap"><input id="${id}" type="password" autocomplete="off" autocapitalize="none"><button type="button" class="pw-eye" data-eye="${id}">Show</button></div>`; }
 const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
@@ -702,6 +704,7 @@ function can(i){ const ri=roleIdx(); return ri>=0 && !!RIGHTS[i][1][ri]; }
 let HELD = [];       // parked sales, loaded in boot()
 let ORDERS = [];     // online orders, loaded in boot()
 let EXPENSES = [];   // shop running costs, loaded in boot()
+let CASHUPS = [];    // end-of-day cash counts (Z report history), loaded in boot()
 let orderFilter=null; // Orders screen: which status card is selected (null = show all)
 let saleDiscount=0, discPending=0, showParked=false;
 let mobileTab='products';   // Sell screen on phones: 'products' or 'cart'
@@ -1392,6 +1395,7 @@ function settings(){
     </div>
     <div class="panel">
       <div class="pt"><h3>Running the shop</h3></div>
+      <div class="set-row"><div><div class="t">Opening float</div><div class="d">Cash left in the drawer to start each day. Used when you count the cash and print the Z report.</div></div><div class="val">KSh <input data-setval="opening_float" inputmode="numeric" value="${sv('opening_float','3000')}" style="width:90px;border:2px solid var(--line2);border-radius:10px;padding:9px 10px;font:inherit;font-weight:800;font-family:'Baloo 2';font-size:16px;text-align:right;background:#fff"></div></div>
       <div class="set-row"><div><div class="t">Warn me when stock runs low</div><div class="d">At 5 pieces left, on WhatsApp to the owner.</div></div><div class="val">5 pieces<button class="switch ${setOn('warn_low_stock',true)?'on':''}" data-swkey="warn_low_stock"></button></div></div>
       <div class="set-row"><div><div class="t">Hold a reserved item for</div><div class="d">When a customer pays a deposit to hold something.</div></div><div class="val">7 days</div></div>
       <div class="set-row"><div><div class="t">Must count cash before closing</div><div class="d">The till will not open tomorrow until today is counted.</div></div><div class="val"><button class="switch ${setOn('must_count_cash',true)?'on':''}" data-swkey="must_count_cash"></button></div></div>
@@ -1432,7 +1436,10 @@ function reports(){
   const refundedRefs=new Set(refundsShown.map(r=>r.ref).filter(Boolean));
   const finalProfit=grossProfit-refundMargin-expTotal;
   const pct=v=>total?Math.round(v/total*100):0;
-  const cashExpected=3000+byM['Cash'];
+  const cashExpected=openingFloat()+byM['Cash'];
+  // the most recent cash count that falls in the selected range (shows today's over/short on the panel)
+  const lastCount=CASHUPS.find(cu=>inRange((cu.at||'').slice(0,10)));
+  const lowNow=PRODUCTS.filter(p=>p.s<5).length;   // items at/under the reorder line
   const mpill={'M-PESA':'mpesa','Card':'card','Cash':'cash'};
   const ranges=[['today','Today'],['yesterday','Yesterday'],['week','Last 7 days']];
   return `<div class="phead"><h2>Sales and reports</h2><p>Everything you have taken and every sale that went through. Tap a sale to see what was in it and print the receipt again.</p></div>
@@ -1484,11 +1491,15 @@ function reports(){
     </div>
   </div>
   <div class="panel" style="margin-top:16px">
-    <div class="pt"><h3>Close the day</h3></div>
-    <div class="set-row"><div><div class="t">Cash that should be in the drawer</div><div class="d">Opening float of 3,000 plus cash sales</div></div><div class="val num">KSh ${money(cashExpected)}</div></div>
+    <div class="pt"><h3>Close the day</h3>${lastCount?`<span class="pill ${lastCount.variance===0?'ok':(lastCount.variance>0?'':'warn')}">Counted ${lastCount.at?lastCount.at.slice(11,16):''}</span>`:''}</div>
+    <div class="set-row"><div><div class="t">Opening float</div><div class="d">Cash you started the day with in the drawer</div></div><div class="val num">KSh ${money(openingFloat())}</div></div>
+    <div class="set-row"><div><div class="t">Cash sales</div><div class="d">Cash taken over the counter${rlabel!=='Today'?' ('+rlabel.toLowerCase()+')':''}</div></div><div class="val num">KSh ${money(byM['Cash'])}</div></div>
+    <div class="set-row"><div><div class="t">Cash that should be in the drawer</div><div class="d">Opening float plus cash sales, before any cash paid out</div></div><div class="val num" style="font-weight:800">KSh ${money(cashExpected)}</div></div>
     <div class="set-row"><div><div class="t">M-PESA received to the till</div><div class="d">Buy Goods ${SHOP.till}</div></div><div class="val num">KSh ${money(byM['M-PESA'])}</div></div>
     <div class="set-row"><div><div class="t">Card received</div><div class="d">Equity terminal</div></div><div class="val num">KSh ${money(byM['Card'])}</div></div>
-    <div style="padding:16px 20px"><button class="btn green" data-zreport>Count the cash and print the Z report</button></div>
+    ${lastCount?`<div class="set-row"><div><div class="t">Last count</div><div class="d">Counted KSh ${money(lastCount.counted)} against KSh ${money(lastCount.expected)} expected</div></div><div class="val num" style="color:${lastCount.variance===0?'var(--mpesa)':(lastCount.variance>0?'var(--blue)':'var(--stop)')}">${lastCount.variance===0?'Balanced':(lastCount.variance>0?'+ KSh '+money(lastCount.variance)+' over':'− KSh '+money(Math.abs(lastCount.variance))+' short')}</div></div>`:''}
+    ${lowNow>0?`<div class="set-row"><div><div class="t">Running low</div><div class="d">Items to reorder soon, printed on the Z report</div></div><div class="val num" style="color:var(--sun)">${lowNow} item${lowNow===1?'':'s'}</div></div>`:''}
+    <div style="padding:16px 20px"><button class="btn green" data-cashup>Count the cash and print the Z report</button></div>
   </div>`;
 }
 
@@ -1607,33 +1618,90 @@ function thermalReceiptHTML(t){ t=t||TXNS[0]; if(!t) return '<div class="tc">No 
     <div class="tc sub">Thank you, karibu tena!</div>`;
 }
 // End-of-day Z report for the range currently selected in Reports.
-function zReportHTML(){
+// Pass the cash count from the cash-up dialog to print the counted amount and over/short.
+function zReportHTML(count){
   const ymd=dt=>{const z=new Date(dt);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0');};
   const today=ymd(new Date()), yest=ymd(new Date(Date.now()-864e5)), weekAgo=ymd(new Date(Date.now()-6*864e5));
   const inRange=d=> !d?true:(repRange==='today'?d===today:repRange==='yesterday'?d===yest:d>=weekAgo);
   const rlabel=repRange==='today'?'Today':repRange==='yesterday'?'Yesterday':'Last 7 days';
   const shown=TXNS.filter(x=>inRange(x.date)), exp=EXPENSES.filter(x=>inRange((x.on||'').slice(0,10)));
-  const count=shown.length, total=shown.reduce((t,x)=>t+x.amt,0);
+  const scount=shown.length, total=shown.reduce((t,x)=>t+x.amt,0);
   const byM={'M-PESA':0,'Card':0,'Cash':0}; shown.forEach(x=>{ if(byM[x.method]!==undefined) byM[x.method]+=x.amt; });
   const items=shown.reduce((t,x)=>t+x.items.reduce((a,i)=>a+i[1],0),0);
+  const vatTotal=shown.reduce((t,x)=>t+(x.vat||0),0);
   const profit=shown.reduce((t,x)=>t+(x.profit||0),0), expTotal=exp.reduce((t,x)=>t+(x.amount||0),0);
-  const cashExpected=3000+byM['Cash'];
-  const row=(l,v,strong)=>`<div style="display:flex;justify-content:space-between;padding:4px 0;${strong?'font-weight:800;border-top:1px solid #000;margin-top:4px;padding-top:7px':''}"><span>${l}</span><span>${v}</span></div>`;
+  const refundsTotal=RETURNS.filter(r=>r.act==='Refunded' && inRange((r.d||'').slice(0,10))).reduce((t,r)=>t+(r.v||0),0);
+  const float=count?count.opening:openingFloat();
+  const paidOut=count?count.paidOut:0;
+  const cashExpected=count?count.expected:(float+byM['Cash']-paidOut);
+  const lowList=PRODUCTS.filter(p=>p.s<5).sort((a,b)=>a.s-b.s);
+  const row=(l,v,strong)=>`<div style="display:flex;justify-content:space-between;padding:4px 0;gap:8px;${strong?'font-weight:800;border-top:1px solid #000;margin-top:4px;padding-top:7px':''}"><span>${l}</span><span style="text-align:right;white-space:nowrap">${v}</span></div>`;
   return `<div style="width:100%;margin:0 auto;font-family:ui-monospace,'Courier New',monospace;color:#000;font-size:13px;font-weight:700">
     <div style="text-align:center;font-weight:800;font-size:15px">${SHOP.name}</div>
     <div style="text-align:center">${SHOP.branch} · Till ${SHOP.till}</div>
     <div style="text-align:center;margin:6px 0 10px">Z REPORT · ${rlabel}<br>${new Date().toLocaleString('en-GB')}</div>
     <div style="border-top:2px dashed #000;padding-top:8px">
-      ${row('Sales',count)}${row('Items sold',items)}${row('Gross sales','KSh '+money(total))}
+      ${row('Sales',scount)}${row('Items sold',items)}${row('Gross sales','KSh '+money(total))}
+      ${refundsTotal?row('Refunds paid out','− KSh '+money(refundsTotal)):''}
+      ${refundsTotal?row('Net takings','KSh '+money(total-refundsTotal),true):''}
+      ${vatTotal>0?row('Of which VAT','KSh '+money(vatTotal)):''}
       <div style="border-top:1px dashed #000;margin:6px 0"></div>
       ${row('M-PESA','KSh '+money(byM['M-PESA']))}${row('Card','KSh '+money(byM['Card']))}${row('Cash','KSh '+money(byM['Cash']))}
       <div style="border-top:1px dashed #000;margin:6px 0"></div>
-      ${row('Opening float','KSh '+money(3000))}${row('Cash expected in drawer','KSh '+money(cashExpected),true)}
+      <div style="text-align:center;font-weight:800;margin:2px 0 4px">CASH DRAWER</div>
+      ${row('Opening float','KSh '+money(float))}${row('Cash sales','+ KSh '+money(byM['Cash']))}
+      ${paidOut?row('Cash paid out','− KSh '+money(paidOut)):''}
+      ${row('Should be in drawer','KSh '+money(cashExpected),true)}
+      ${count?row('Counted','KSh '+money(count.counted)):''}
+      ${count?row(count.variance===0?'Balanced':(count.variance>0?'Over':'Short'), (count.variance>0?'+ ':(count.variance<0?'− ':''))+'KSh '+money(Math.abs(count.variance)),true):''}
       <div style="border-top:1px dashed #000;margin:6px 0"></div>
       ${row('Profit from sales','KSh '+money(profit))}${row('Expenses','− KSh '+money(expTotal))}${row('Final profit','KSh '+money(profit-expTotal),true)}
+      ${lowList.length?`<div style="border-top:1px dashed #000;margin:6px 0"></div>
+      <div style="text-align:center;font-weight:800;margin:2px 0 4px">REORDER SOON (${lowList.length})</div>
+      ${lowList.slice(0,15).map(p=>row(p.n.length>26?p.n.slice(0,25)+'…':p.n, p.s+' left')).join('')}
+      ${lowList.length>15?`<div style="text-align:center;font-size:11px">and ${lowList.length-15} more — see Stock</div>`:''}`:''}
     </div>
-    <div style="text-align:center;margin-top:12px;font-size:11px">Counted by ${currentUser?currentUser.name:''}</div>
+    <div style="text-align:center;margin-top:12px;font-size:11px">Counted by ${(count&&count.cashier)||(currentUser?currentUser.name:'')}</div>
+    <div style="text-align:center;font-size:11px">Signature ______________________</div>
   </div>`;
+}
+// The end-of-day cash-up dialog: count the drawer, see over/short, save and print the Z report.
+function openCashup(){
+  const m=document.getElementById('hwmodal'); if(!m) return;
+  const ymd=dt=>{const z=new Date(dt);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0');};
+  const today=ymd(new Date()), yest=ymd(new Date(Date.now()-864e5)), weekAgo=ymd(new Date(Date.now()-6*864e5));
+  const inRange=d=> !d?true:(repRange==='today'?d===today:repRange==='yesterday'?d===yest:d>=weekAgo);
+  const rlabel=repRange==='today'?'Today':repRange==='yesterday'?'Yesterday':'Last 7 days';
+  const shown=TXNS.filter(x=>inRange(x.date));
+  const cashSales=shown.filter(x=>x.method==='Cash').reduce((t,x)=>t+x.amt,0);
+  const refundsTotal=RETURNS.filter(r=>r.act==='Refunded' && inRange((r.d||'').slice(0,10))).reduce((t,r)=>t+(r.v||0),0);
+  const float=openingFloat();
+  window.__cashup={float,cashSales,rlabel};
+  const fld=(label,hint,id,val,ph)=>`<div style="margin-bottom:12px"><label style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">${label}</label>${hint?`<div style="color:var(--mut);font-size:12px;font-weight:600;margin-bottom:6px">${hint}</div>`:''}<input id="${id}" inputmode="numeric" value="${val!=null?val:''}" placeholder="${ph||'0'}" style="width:100%;padding:11px 13px;border:2px solid var(--line2);border-radius:11px;font:inherit;font-weight:800;font-size:16px"></div>`;
+  m.innerHTML=`<div class="rcpt-wrap" style="max-width:420px">
+    <h3 style="margin-bottom:4px">Count the cash — ${rlabel}</h3>
+    <div style="color:var(--mut);font-size:12.5px;font-weight:600;margin-bottom:14px">Count everything in the drawer, then type the total. M-PESA and card do not go in the drawer.</div>
+    <div style="background:#f5fbfc;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-weight:700;font-size:13.5px">
+      <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Opening float</span><span class="num">KSh ${money(float)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Cash sales</span><span class="num">+ KSh ${money(cashSales)}</span></div>
+    </div>
+    ${fld('Cash paid out of the till', 'Refunds or petty cash you took from the drawer'+(refundsTotal?'. Refunds today: KSh '+money(refundsTotal):''), 'cu-paidout', 0)}
+    <div id="cu-expected" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:8px 2px;border-top:2px solid var(--line2);border-bottom:2px solid var(--line2);margin-bottom:14px"><span>Should be in the drawer</span><span class="num">KSh ${money(float+cashSales)}</span></div>
+    ${fld('Cash you counted', 'The actual notes and coins in the drawer', 'cu-counted', '', 'Type the total')}
+    <div id="cu-var" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 2px;margin-bottom:6px;color:var(--mut)"><span>Over or short</span><span class="num">—</span></div>
+    <div style="display:flex;gap:9px;margin-top:14px"><button class="btn green" style="flex:1" data-hw="cashup-save">Save and print Z report</button><button class="btn" data-hw="close">Close</button></div>
+  </div>`;
+  window.__hwkind='cashup'; m.classList.add('show');
+  const recalc=()=>{ const paid=Math.max(0,parseInt((document.getElementById('cu-paidout')||{}).value||'0',10)||0);
+    const expected=float+cashSales-paid; window.__cashup.paidOut=paid; window.__cashup.expected=expected;
+    const ee=document.getElementById('cu-expected'); if(ee) ee.querySelector('.num').textContent='KSh '+money(expected);
+    const cv=(document.getElementById('cu-counted')||{}).value; const ve=document.getElementById('cu-var');
+    if(cv===''||cv==null){ if(ve){ ve.style.color='var(--mut)'; ve.querySelector('.num').textContent='—'; } return; }
+    const counted=Math.max(0,parseInt(cv,10)||0); const v=counted-expected;
+    if(ve){ ve.style.color=v===0?'var(--mpesa)':(v>0?'var(--blue)':'var(--stop)'); ve.querySelector('.num').textContent=(v>0?'+ ':(v<0?'− ':''))+'KSh '+money(Math.abs(v))+(v===0?' · balanced':(v>0?' over':' short')); }
+  };
+  setTimeout(()=>{ const po=document.getElementById('cu-paidout'), cc=document.getElementById('cu-counted');
+    if(po) po.addEventListener('input',recalc); if(cc){ cc.addEventListener('input',recalc); cc.focus(); } recalc(); },30);
 }
 function receiptHTML(t){ t=t||TXNS[0]; if(!t) return '<div style="padding:30px;text-align:center;color:#98897d;font-family:Nunito,sans-serif;font-weight:700">No sales yet to print.</div>';
   const registered=setOn('vat_registered',false);
@@ -1925,6 +1993,7 @@ screen.addEventListener('click',async e=>{
   // settings: save the VAT rate to the server
   const trc=e.target.closest('[data-testreceipt]'); if(trc){ const sample=TXNS[0]||{t:new Date().toTimeString().slice(0,5),ref:'TEST',cust:'Walk-in',method:'Cash',amt:1500,vat:0,cashier:currentUser?currentUser.name:'',items:[['Sample item',1,1500],['Another item',2,500]]}; printHTML('Test receipt', thermalReceiptHTML(sample), receiptPrintCss()); return; }
   const tlb=e.target.closest('[data-testlabel]'); if(tlb){ const p=PRODUCTS[0]; if(!p){ toast('Add a product first',true); return; } printHTML('Test label', labelSheetHTML(p,1), labelPrintCss()); return; }
+  const cu=e.target.closest('[data-cashup]'); if(cu){ openCashup(); return; }
   const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), receiptPrintCss()); toast('Z report ready to print'); return; }
   const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), thermalReceiptHTML(t), receiptPrintCss()); return; }
   const sret=e.target.closest('[data-startreturn]'); if(sret){ const ref=sret.dataset.startreturn; returnFromSale=TXNS.find(x=>String(x.ref)===String(ref))||null; newReturnOpen=true; view='returns'; render(); window.scrollTo(0,0); return; }
@@ -2042,6 +2111,22 @@ document.getElementById('hwmodal').addEventListener('click',e=>{
     document.getElementById('hwmodal').classList.remove('show');
     toast('Sent '+n+' label'+(n>1?'s':'')+' to print');
   }
+  if(hw.dataset.hw==='cashup-save'){
+    const cv=(document.getElementById('cu-counted')||{}).value;
+    if(cv===''||cv==null){ toast('Type the cash you counted first',true); const cc=document.getElementById('cu-counted'); if(cc)cc.focus(); return; }
+    const s=window.__cashup||{}; const paidOut=Math.max(0,parseInt((document.getElementById('cu-paidout')||{}).value||'0',10)||0);
+    const counted=Math.max(0,parseInt(cv,10)||0); const expected=(s.float||0)+(s.cashSales||0)-paidOut;
+    const count={opening:s.float||0,cashSales:s.cashSales||0,paidOut,expected,counted,variance:counted-expected,cashier:currentUser?currentUser.name:''};
+    // show it on the panel straight away, then reconcile with the server's saved copy
+    const nowStamp=(()=>{ const d=new Date(),z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); })();
+    CASHUPS.unshift(Object.assign({at:nowStamp,range:s.rlabel||'Today'},count));
+    api('/api/cashup','POST',{range:s.rlabel||'Today',opening:count.opening,cashSales:count.cashSales,paidOut,expected,counted,cashier:count.cashier})
+      .then(r=>{ if(r.cashups){ CASHUPS=r.cashups; render(); } }).catch(()=>toast('Saved on this device only — could not reach the server',true));
+    document.getElementById('hwmodal').classList.remove('show');
+    printHTML('Z report', zReportHTML(count), receiptPrintCss());
+    const vtxt=count.variance===0?'drawer balanced':(count.variance>0?('over by KSh '+money(count.variance)):('short by KSh '+money(Math.abs(count.variance))));
+    toast('Day counted — '+vtxt); render();
+  }
 });
 // barcode scanner: keyboard wedge, and Enter inside a search or scan field
 let wedgeBuf='', wedgeLast=0;
@@ -2075,7 +2160,7 @@ async function refreshData(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY;
+    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY;
   }catch(e){}
 }
 async function boot(){
@@ -2084,7 +2169,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[];
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[];
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}

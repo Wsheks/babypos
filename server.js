@@ -152,6 +152,29 @@ function addExpense(body) {
 function allSales() {
   return db.prepare('SELECT * FROM sales ORDER BY datetime DESC, id DESC').all().map(saleOut);
 }
+// --- till-close cash counts (the Z report's record) ---
+function cashupOut(r) {
+  return { id: r.id, at: r.at, range: r.for_range, cashier: r.cashier,
+           opening: r.opening, cashSales: r.cash_sales, paidOut: r.paid_out,
+           expected: r.expected, counted: r.counted, variance: r.variance };
+}
+function allCashups() {
+  return db.prepare('SELECT * FROM cash_ups ORDER BY id DESC LIMIT 30').all().map(cashupOut);
+}
+function addCashup(body) {
+  const opening = Math.max(0, Math.round(Number(body.opening) || 0));
+  const cashSales = Math.max(0, Math.round(Number(body.cashSales) || 0));
+  const paidOut = Math.max(0, Math.round(Number(body.paidOut) || 0));
+  // Trust the client's expected only if given; otherwise recompute so the record is self-consistent.
+  const expected = Number.isFinite(Number(body.expected)) ? Math.round(Number(body.expected)) : (opening + cashSales - paidOut);
+  const counted = Math.max(0, Math.round(Number(body.counted) || 0));
+  const variance = counted - expected;
+  const id = db.prepare(
+    `INSERT INTO cash_ups (at, for_range, cashier, opening, cash_sales, paid_out, expected, counted, variance)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(localStamp(), String(body.range || 'Today'), body.cashier || null, opening, cashSales, paidOut, expected, counted, variance).lastInsertRowid;
+  return cashupOut(db.prepare('SELECT * FROM cash_ups WHERE id = ?').get(id));
+}
 function heldOut(h) {
   return { id: h.id, type: h.type, cust: h.customer, deposit: h.deposit,
            lines: JSON.parse(h.lines || '[]'), at: h.at };
@@ -478,7 +501,14 @@ const server = http.createServer(async (req, res) => {
         intake: del.intake,
         delivery: del.delivery,
         expenses: allExpenses(),
+        cashups: allCashups(),
       });
+    }
+
+    // Record an end-of-day cash count (the Z report). Returns the saved count + recent history.
+    if (p === '/api/cashup' && method === 'POST') {
+      const body = await readBody(req);
+      return sendJSON(res, 200, { cashup: addCashup(body), cashups: allCashups() });
     }
 
     // Upload a product photo (sent as a data URL). Saves a file and returns its URL.
@@ -605,6 +635,12 @@ const server = http.createServer(async (req, res) => {
       TOGGLE_KEYS.forEach(k => {
         if (body[k] !== undefined) setSetting(k, (body[k] === '1' || body[k] === 1 || body[k] === true) ? '1' : '0');
       });
+      // Opening float (cash left in the drawer to start the day) — whole shillings.
+      if (body.opening_float !== undefined) {
+        const f = Math.round(Number(body.opening_float));
+        if (!Number.isFinite(f) || f < 0) return sendJSON(res, 400, { error: 'Opening float must be a whole number of shillings, 0 or more' });
+        setSetting('opening_float', f);
+      }
       // Free-value settings (printer calibration, etc.) stored as strings.
       ['receipt_width', 'receipt_text', 'label_size'].forEach(k => {
         if (body[k] !== undefined) setSetting(k, String(body[k]));
