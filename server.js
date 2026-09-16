@@ -56,12 +56,22 @@ function aiConfigPath() { return path.join(__dirname, 'ai.json'); }
 function aiConfig() { try { return JSON.parse(fs.readFileSync(aiConfigPath(), 'utf8')); } catch (e) { return null; } }
 function aiEnabled() { const c = aiConfig(); return !!(c && c.key); }
 function bgEnabled() { const c = aiConfig(); return !!(c && c.removebg_key); }
+// Detect the real image type from the file's first bytes (extensions can lie), for the vision API.
+function sniffImageType(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp';
+  return null;
+}
 // Remove the background of an image via the remove.bg API and flatten onto white.
 // Input is base64 (no data: prefix); returns the processed image as a Buffer (PNG).
 function removeBgViaService({ b64, key }) {
   return new Promise((resolve, reject) => {
-    // type=product helps remove.bg find the item in flat-lay clothing/object shots (auto often can't).
-    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&type=product&bg_color=ffffff';
+    // type=product helps remove.bg find the item in flat-lay shots; format=png keeps the output a
+    // real PNG (with bg_color the result is opaque, and format=auto would hand back JPEG bytes).
+    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&type=product&bg_color=ffffff&format=png';
     const req = https.request({
       hostname: 'api.remove.bg', path: '/v1.0/removebg', method: 'POST',
       headers: { 'X-Api-Key': key, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(form) },
@@ -654,9 +664,9 @@ const server = http.createServer(async (req, res) => {
         const name = path.basename(String(body.imageFile));
         const file = path.join(UPLOAD_DIR, name);
         if (!name || !fs.existsSync(file)) return sendJSON(res, 200, { ok: false, error: 'Could not find that photo on the server' });
-        const ext = (name.split('.').pop() || '').toLowerCase();
-        mediaType = EXT_MIME[ext] || 'image/jpeg';
-        base64 = fs.readFileSync(file).toString('base64');
+        const buf = fs.readFileSync(file);
+        mediaType = sniffImageType(buf) || EXT_MIME[(name.split('.').pop() || '').toLowerCase()] || 'image/jpeg';
+        base64 = buf.toString('base64');
       } else if (body.image) {
         const m = String(body.image).match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
         if (!m) return sendJSON(res, 200, { ok: false, error: 'Not a valid image' });
