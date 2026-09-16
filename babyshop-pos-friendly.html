@@ -674,6 +674,7 @@ let MOVEMENTS=[], movementsLoaded=false, stockRepDays=30;   // Stock report: aud
 let sellSearch='', stockSearch='';   // live product filters on the Sell and Stock screens
 let npImages=[];                     // photos being added on the new-product form
 let AI_TITLES=false, AI_MODEL='claude-haiku-4-5';   // AI product naming (set from the server if an API key is configured)
+let BG_REMOVAL=false;   // photo background removal via remove.bg (set from the server if a key is configured)
 let editPhotos=null, editPhotosList=[]; // managing an existing product's photo gallery
 let repMethod=null;   // Reports: filter sales list by payment method (null = all)
 let stockFilter=null; // Stock: 'low' shows only low-stock products (null = all)
@@ -1202,6 +1203,7 @@ function productsPanel(){
         <div id="np-imglist" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join('')}</div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <label class="btn sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>Upload photos<input id="np-imgfile" type="file" accept="image/*" multiple style="display:none"></label>
+          ${BG_REMOVAL?`<label style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:12.5px;cursor:pointer" title="Cuts the item out and puts it on a clean white background."><input type="checkbox" id="np-removebg"> Remove background</label>`:''}
           <span id="np-imgstatus" style="font-size:12.5px;color:var(--mut);font-weight:600">Add one or more. The first photo is the main one shown on the card.</span>
         </div></div>
       <div class="field" style="grid-column:1 / -1"><label>Colours shown online</label><div id="np-colours" style="display:flex;flex-wrap:wrap;gap:8px">${Object.entries(WEB_PALETTE).map(([k,hex])=>`<label style="display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line2);border-radius:999px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--ink2);cursor:pointer"><input type="checkbox" value="${k}"><span style="width:13px;height:13px;border-radius:50%;background:${hex};display:inline-block"></span>${k}</label>`).join('')}</div></div>
@@ -1529,6 +1531,15 @@ function settings(){
         :`<div class="d" style="margin-bottom:12px;line-height:1.6">Let the till look at a product photo and suggest a name, so you do not use supplier names. This needs an Anthropic API key. It is pay as you go, about half a cent or less per photo, billed separately from any Claude subscription. Create a key at console.anthropic.com, add a little credit, then paste it here.</div>
         <div class="field" style="padding:0"><label>Anthropic API key</label><div style="display:flex;gap:8px"><input id="ai-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" style="flex:1;border:2px solid var(--line2);border-radius:11px;padding:11px 13px;font:inherit;font-weight:700"><button type="button" class="btn sm" data-eye="ai-key">Show</button></div></div>
         <button class="btn green sm" data-aisave style="margin-top:12px">Save key and turn on</button>`}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="pt"><h3>Photo background removal</h3>${BG_REMOVAL?'<span class="pill ok">On</span>':'<span class="pill warn">Off</span>'}</div>
+      <div style="padding:16px 20px">
+        ${BG_REMOVAL?`<div class="set-row" style="padding:0"><div><div class="t">Background removal is on</div><div class="d">On the Add product screen, tick "Remove background" before you upload a photo. The item is cut out and placed on a clean white background.</div></div><div class="val"><button class="btn sm" data-bgclear style="color:var(--stop)">Remove key</button></div></div>`
+        :`<div class="d" style="margin-bottom:12px;line-height:1.6">Cut the item out of a photo and put it on a clean white background, so your products look tidy. This uses remove.bg, which is free for about 50 photos a month, then a few cents each. Create a key at remove.bg (in your profile, under API), then paste it here.</div>
+        <div class="field" style="padding:0"><label>remove.bg API key</label><div style="display:flex;gap:8px"><input id="bg-key" type="password" placeholder="your remove.bg key" autocomplete="off" spellcheck="false" style="flex:1;border:2px solid var(--line2);border-radius:11px;padding:11px 13px;font:inherit;font-weight:700"><button type="button" class="btn sm" data-eye="bg-key">Show</button></div></div>
+        <button class="btn green sm" data-bgsave style="margin-top:12px">Save key and turn on</button>`}
       </div>
     </div>`:''}`;
   }
@@ -2162,8 +2173,10 @@ screen.addEventListener('click',async e=>{
   // channels: publish the catalogue to the website
   const pub=e.target.closest('[data-publishcat]'); if(pub){ try{ const r=await api('/api/catalogue/publish','POST'); SETTINGS.catalogue_published_at=r.at; SETTINGS.catalogue_count=String(r.count); toast('Published '+r.count+' items to the website'); }catch(err){ toast('Could not publish the catalogue',true); } render(); return; }
   // settings: change my own password
-  const aisv=e.target.closest('[data-aisave]'); if(aisv){ const el=document.getElementById('ai-key'); const key=(el&&el.value||'').trim(); if(key.length<10){ toast('Paste your Anthropic API key first',true); if(el)el.focus(); return; } aisv.disabled=true; aisv.textContent='Saving…'; try{ const r=await api('/api/ai-config','POST',{key}); AI_TITLES=!!r.enabled; if(r.model)AI_MODEL=r.model; toast('AI naming is on'); }catch(err){ toast(err.message||'Could not save the key',true); } aisv.disabled=false; render(); return; }
-  const aicl=e.target.closest('[data-aiclear]'); if(aicl){ try{ await api('/api/ai-config','POST',{clear:true}); AI_TITLES=false; toast('AI naming turned off'); }catch(err){ toast(err.message||'Could not remove the key',true); } render(); return; }
+  const aisv=e.target.closest('[data-aisave]'); if(aisv){ const el=document.getElementById('ai-key'); const key=(el&&el.value||'').trim(); if(key.length<10){ toast('Paste your Anthropic API key first',true); if(el)el.focus(); return; } aisv.disabled=true; aisv.textContent='Saving…'; try{ const r=await api('/api/ai-config','POST',{key}); AI_TITLES=!!r.aiTitles; if(r.model)AI_MODEL=r.model; toast('AI naming is on'); }catch(err){ toast(err.message||'Could not save the key',true); } aisv.disabled=false; render(); return; }
+  const aicl=e.target.closest('[data-aiclear]'); if(aicl){ try{ const r=await api('/api/ai-config','POST',{clear:true}); AI_TITLES=!!(r&&r.aiTitles); toast('AI naming turned off'); }catch(err){ toast(err.message||'Could not remove the key',true); } render(); return; }
+  const bgsv=e.target.closest('[data-bgsave]'); if(bgsv){ const el=document.getElementById('bg-key'); const key=(el&&el.value||'').trim(); if(key.length<10){ toast('Paste your remove.bg key first',true); if(el)el.focus(); return; } bgsv.disabled=true; bgsv.textContent='Saving…'; try{ const r=await api('/api/ai-config','POST',{removebg_key:key}); BG_REMOVAL=!!r.bgRemoval; toast('Background removal is on'); }catch(err){ toast(err.message||'Could not save the key',true); } bgsv.disabled=false; render(); return; }
+  const bgcl=e.target.closest('[data-bgclear]'); if(bgcl){ try{ const r=await api('/api/ai-config','POST',{clearRemovebg:true}); BG_REMOVAL=!!(r&&r.bgRemoval); toast('Background removal turned off'); }catch(err){ toast(err.message||'Could not remove the key',true); } render(); return; }
   const cpw=e.target.closest('[data-changepw]'); if(cpw){ const cur=(document.getElementById('cpw-cur')||{}).value||''; const nw=(document.getElementById('cpw-new')||{}).value||''; if(nw.length<4){ toast('New password must be at least 4 characters',true); return; } try{ await api('/api/password','POST',{username:currentUser.username,currentPassword:cur,newPassword:nw}); toast('Your password is changed'); }catch(err){ toast(err.message||'Could not change password',true); } return; }
   // settings: add a new staff member
   const sadd=e.target.closest('[data-staffadd]'); if(sadd){ staffAdd=true; staffPwEdit=null; staffDel=null; render(); return; }
@@ -2211,8 +2224,9 @@ screen.addEventListener('change',async e=>{
   if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
   // product photo: downscale, upload, then show a preview and fill the image link
   if(e.target.id==='np-imgfile'){ const files=[...(e.target.files||[])]; if(!files.length) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
-    try{ for(const f of files){ const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); npImages.push(r.url); } const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); if(st){ st.textContent=npImages.length+' photo'+(npImages.length>1?'s':'')+' added'; st.style.color='var(--mpesa)'; } }
-    catch(err){ if(st){ st.textContent='Could not upload'; st.style.color='var(--stop)'; } }
+    const rmbg=(document.getElementById('np-removebg')||{}).checked;
+    try{ let i=0; for(const f of files){ i++; let url; if(rmbg){ if(st){ st.textContent=files.length>1?('Removing background '+i+' of '+files.length+'…'):'Removing background…'; st.style.color='var(--mut)'; } const dataUrl=await fileToDataUrl(f,1000,0.9); const r=await api('/api/upload-nobg','POST',{data:dataUrl}); if(!r||!r.ok) throw new Error((r&&r.error)||'Background removal failed'); url=r.url; } else { const dataUrl=await fileToDataUrl(f,900,0.82); const r=await api('/api/upload','POST',{data:dataUrl}); url=r.url; } npImages.push(url); } const el=document.getElementById('np-imglist'); if(el) el.innerHTML=npImages.map((u,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)"><button type="button" data-npimgdel="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--stop);color:#fff;font-weight:800;cursor:pointer;line-height:1">✕</button></div>`).join(''); if(st){ st.textContent=npImages.length+' photo'+(npImages.length>1?'s':'')+' added'; st.style.color='var(--mpesa)'; } }
+    catch(err){ if(st){ st.textContent=rmbg?'Could not remove the background, try unticking it':'Could not upload'; st.style.color='var(--stop)'; } }
     e.target.value='';
   }
   if(e.target.id==='ep-imgfile'){ const files=[...(e.target.files||[])]; if(!files.length) return; const st=document.getElementById('ep-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
@@ -2307,7 +2321,7 @@ async function refreshData(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY; AI_TITLES=!!d.aiTitles; if(d.aiModel)AI_MODEL=d.aiModel;
+    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(e){}
 }
 async function boot(){
@@ -2316,7 +2330,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[]; AI_TITLES=!!d.aiTitles; if(d.aiModel)AI_MODEL=d.aiModel;
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[]; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}

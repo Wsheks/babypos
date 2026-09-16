@@ -55,6 +55,31 @@ function sendMail({ key, from, to, subject, text }) {
 function aiConfigPath() { return path.join(__dirname, 'ai.json'); }
 function aiConfig() { try { return JSON.parse(fs.readFileSync(aiConfigPath(), 'utf8')); } catch (e) { return null; } }
 function aiEnabled() { const c = aiConfig(); return !!(c && c.key); }
+function bgEnabled() { const c = aiConfig(); return !!(c && c.removebg_key); }
+// Remove the background of an image via the remove.bg API and flatten onto white.
+// Input is base64 (no data: prefix); returns the processed image as a Buffer (PNG).
+function removeBgViaService({ b64, key }) {
+  return new Promise((resolve, reject) => {
+    const form = 'image_file_b64=' + encodeURIComponent(b64) + '&size=auto&bg_color=ffffff';
+    const req = https.request({
+      hostname: 'api.remove.bg', path: '/v1.0/removebg', method: 'POST',
+      headers: { 'X-Api-Key': key, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(form) },
+    }, r => {
+      const chunks = [];
+      r.on('data', d => chunks.push(d));
+      r.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        if (r.statusCode >= 200 && r.statusCode < 300) return resolve(buf);
+        let m = 'remove.bg ' + r.statusCode;
+        try { const j = JSON.parse(buf.toString('utf8')); if (j.errors && j.errors[0] && j.errors[0].title) m = j.errors[0].title; } catch (_) {}
+        reject(new Error(m));
+      });
+    });
+    req.setTimeout(40000, () => { req.destroy(); reject(new Error('remove.bg took too long')); });
+    req.on('error', reject);
+    req.write(form); req.end();
+  });
+}
 // Tidy the model's reply into a clean product title.
 function cleanTitle(s) {
   s = String(s || '').trim()
@@ -575,21 +600,47 @@ const server = http.createServer(async (req, res) => {
         expenses: allExpenses(),
         cashups: allCashups(),
         aiTitles: aiEnabled(),
+        bgRemoval: bgEnabled(),
         aiModel: (aiConfig() || {}).model || 'claude-haiku-4-5',
       });
     }
 
-    // Owner saves (or clears) the Anthropic API key that powers AI product naming.
+    // Owner saves (or clears) the API keys: Anthropic (naming) and remove.bg (background).
     if (p === '/api/ai-config' && method === 'POST') {
-      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can set up AI naming' });
+      if (!isOwnerRequest(req)) return sendJSON(res, 403, { error: 'Only the owner can set this up' });
       const body = await readBody(req);
-      if (body.clear) { try { fs.unlinkSync(aiConfigPath()); } catch (e) {} return sendJSON(res, 200, { enabled: false }); }
-      const key = String(body.key || '').trim();
-      if (key.length < 10) return sendJSON(res, 400, { error: 'That does not look like a valid API key' });
-      const model = String(body.model || '').trim() || 'claude-haiku-4-5';
-      fs.writeFileSync(aiConfigPath(), JSON.stringify({ key, model }, null, 2));
-      try { fs.chmodSync(aiConfigPath(), 0o600); } catch (e) {}
-      return sendJSON(res, 200, { enabled: true, model });
+      const cfg = aiConfig() || {};
+      if (body.clear) delete cfg.key;
+      if (body.clearRemovebg) delete cfg.removebg_key;
+      if (typeof body.key === 'string' && body.key.trim()) {
+        if (body.key.trim().length < 10) return sendJSON(res, 400, { error: 'That does not look like a valid API key' });
+        cfg.key = body.key.trim();
+      }
+      if (typeof body.model === 'string' && body.model.trim()) cfg.model = body.model.trim();
+      if (typeof body.removebg_key === 'string' && body.removebg_key.trim()) {
+        if (body.removebg_key.trim().length < 10) return sendJSON(res, 400, { error: 'That does not look like a valid remove.bg key' });
+        cfg.removebg_key = body.removebg_key.trim();
+      }
+      if (!cfg.key && !cfg.removebg_key) { try { fs.unlinkSync(aiConfigPath()); } catch (e) {} }
+      else { fs.writeFileSync(aiConfigPath(), JSON.stringify(cfg, null, 2)); try { fs.chmodSync(aiConfigPath(), 0o600); } catch (e) {} }
+      return sendJSON(res, 200, { aiTitles: !!cfg.key, bgRemoval: !!cfg.removebg_key, model: cfg.model || 'claude-haiku-4-5' });
+    }
+
+    // Upload a photo with its background removed (via remove.bg). Returns the saved URL.
+    if (p === '/api/upload-nobg' && method === 'POST') {
+      const cfg = aiConfig();
+      if (!cfg || !cfg.removebg_key) return sendJSON(res, 200, { ok: false, error: 'Background removal is not set up yet' });
+      const body = await readBody(req);
+      const m = String(body.data || '').match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+      if (!m) return sendJSON(res, 200, { ok: false, error: 'Not a valid image' });
+      try {
+        const png = await removeBgViaService({ b64: m[2], key: cfg.removebg_key });
+        const name = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + '.png';
+        fs.writeFileSync(path.join(UPLOAD_DIR, name), png);
+        return sendJSON(res, 200, { ok: true, url: '//' + (req.headers.host || 'localhost') + '/uploads/' + name });
+      } catch (err) {
+        return sendJSON(res, 200, { ok: false, error: String((err && err.message) || err).slice(0, 200) });
+      }
     }
 
     // Suggest a product title from an outfit photo (AI vision). Returns { ok, title } or { ok:false, error }.
