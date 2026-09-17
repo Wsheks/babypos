@@ -639,6 +639,14 @@ let staffDel = null;    // which staff member's remove-confirm is showing
 function setOn(key, def){ const v=SETTINGS[key]; return v!==undefined ? (v==='1'||v===1||v===true) : def; }
 // Opening float = the cash left in the drawer to start the day (set in Settings). Defaults to 3,000.
 function openingFloat(){ const v=Number(SETTINGS.opening_float); return Number.isFinite(v)&&v>=0 ? v : 3000; }
+// Days from today until an expiry date (negative = already expired, null = no date).
+function daysUntil(dateStr){ if(!dateStr) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d.getTime())) return null; const today=new Date(); today.setHours(0,0,0,0); return Math.round((d-today)/864e5); }
+function niceDate(dateStr){ const d=new Date(dateStr+'T00:00:00'); return isNaN(d.getTime())?dateStr:d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}); }
+// A coloured chip for a product's expiry: red if expired, amber within 30 days, grey otherwise.
+function expiryChip(p){ const d=daysUntil(p&&p.expiry); if(d===null) return ''; const nd=niceDate(p.expiry);
+  if(d<0) return '<span class="pill" style="margin-left:8px;background:#fdecea;color:var(--stop)">Expired '+nd+'</span>';
+  if(d<=30) return '<span class="pill" style="margin-left:8px;background:#fff4e0;color:var(--sun-d)">Expires '+nd+'</span>';
+  return '<span class="pill" style="margin-left:8px;background:var(--line);color:var(--mut)">Exp '+nd+'</span>'; }
 // A password box with a Show/Hide eye button.
 function pwInput(id){ return `<div class="pw-wrap"><input id="${id}" type="password" autocomplete="off" autocapitalize="none"><button type="button" class="pw-eye" data-eye="${id}">Show</button></div>`; }
 const babyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>';
@@ -708,6 +716,8 @@ let HELD = [];       // parked sales, loaded in boot()
 let ORDERS = [];     // online orders, loaded in boot()
 let EXPENSES = [];   // shop running costs, loaded in boot()
 let CASHUPS = [];    // end-of-day cash counts (Z report history), loaded in boot()
+let CUSTOMERS = [];  // customer records with loyalty (visits, spend, points), loaded in boot()
+let custSearch = '', custEdit = null, custAdd = false;   // Customers screen state
 let orderFilter=null; // Orders screen: which status card is selected (null = show all)
 let saleDiscount=0, discPending=0, showParked=false;
 let mobileTab='products';   // Sell screen on phones: 'products' or 'cart'
@@ -723,6 +733,7 @@ const NAV = [
   {key:'stock', label:'Stock', need:()=>can(3)||can(4), icon:'<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>'},
   {key:'reports', label:'Reports', need:()=>can(7)||can(8), icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'},
   {key:'returns', label:'Returns', need:()=>can(0), icon:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 015 5v0a5 5 0 01-5 5H8"/>'},
+  {key:'customers', label:'Customers', need:()=>can(7), icon:'<circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>'},
   {key:'settings', label:'Settings', need:()=>can(7), icon:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>'},
 ];
 function allowedNav(){ return NAV.filter(n=>n.need()); }
@@ -963,7 +974,7 @@ async function finishSale(){
     const r=await api('/api/sales','POST',{
       lines:CART.map(l=>({id:l.id,n:l.n,a:l.a,q:l.q,p:l.p})),
       method:payMethod, discountPct:0, discountAmount:saleDiscount, total:dueT(),
-      customer:saleCustomer?saleCustomer.name:'Walk-in', cashier:currentUser?currentUser.name:'',
+      customer:saleCustomer?saleCustomer.name:'Walk-in', customerId:saleCustomer&&saleCustomer.id||null, cashier:currentUser?currentUser.name:'',
       splitParts:payMethod==='split'?splitParts:null, channel:'counter', mpesaRef:mpesaCode||null
     });
     PRODUCTS=r.products; TXNS.unshift(r.sale);
@@ -1207,6 +1218,7 @@ function productsPanel(){
       <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
       <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
       <div class="field"><label>Wholesale price (KSh)</label><input id="np-whole" placeholder="e.g. 1800 (optional)" inputmode="numeric"></div>
+      <div class="field" style="grid-column:1 / -1"><label>Expiry date (optional, for formula, wipes, skincare)</label><input id="np-expiry" type="date"><div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:4px">Leave blank for clothing and anything that does not expire. The till warns you before dated items run out of date.</div></div>
       <div class="field" style="grid-column:1 / -1"><label>VAT</label><select id="np-vat" class="sel" style="padding:12px 14px;width:100%"><option value="standard">Standard rate${setOn('vat_registered',false)?` (${SHOP.vat}%, included in the price)`:' (VAT applies once you register)'}</option><option value="exempt">VAT exempt (never carries VAT)</option></select></div>
       <div class="field" style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:12px"><label style="color:var(--sun-d)">For the shop website</label></div>
       <div class="field"><label>Category</label>
@@ -1248,7 +1260,7 @@ function productsPanel(){
       ${shownProds.map(pr=>`<div class="item-row">
         <div class="thumb">${prodPic(pr)}</div>
         <div>
-          <div class="ir-nm">${pr.n}${pr.sizeLabel?'<span class="pill" style="margin-left:8px;background:var(--teal-t,#e2f4f7);color:var(--teal,#0e94ac)">'+pr.sizeLabel+'</span>':''}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
+          <div class="ir-nm">${pr.n}${pr.sizeLabel?'<span class="pill" style="margin-left:8px;background:var(--teal-t,#e2f4f7);color:var(--teal,#0e94ac)">'+pr.sizeLabel+'</span>':''}${expiryChip(pr)}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
         </div>
         <div class="ir-right">
@@ -1260,6 +1272,7 @@ function productsPanel(){
         <div class="pe-fld"><label>Selling price (KSh)</label><input id="ep-p-${pr.id}" inputmode="numeric" value="${pr.p||''}"></div>
         <div class="pe-fld"><label>Cost price (KSh)</label><input id="ep-c-${pr.id}" inputmode="numeric" value="${pr.c||''}"></div>
         <div class="pe-fld"><label>Wholesale (KSh)</label><input id="ep-w-${pr.id}" inputmode="numeric" value="${pr.w||''}"></div>
+        <div class="pe-fld"><label>Expiry (optional)</label><input id="ep-exp-${pr.id}" type="date" value="${pr.expiry||''}"></div>
         <button class="btn green sm" data-prodsave="${pr.id}">Save</button>
         <button class="btn sm" data-prodcancel>Cancel</button>
       </div>`:''}`).join('')}
@@ -1287,7 +1300,9 @@ function stockReportData(){
   const withSold=PRODUCTS.map(p=>({p,sold:sold[p.n.toLowerCase()]||0}));
   const best=withSold.filter(x=>x.sold>0).sort((a,b)=>b.sold-a.sold).slice(0,12);
   const dead=withSold.filter(x=>x.sold===0&&x.p.s>0).sort((a,b)=>(b.p.s*(b.p.c||0))-(a.p.s*(a.p.c||0))).slice(0,15);
-  return {days,units,costVal,retailVal,cats,out,low,best,dead};
+  // Expiry watch: dated items already expired or within 60 days, soonest first.
+  const expiring=PRODUCTS.filter(p=>p.expiry&&daysUntil(p.expiry)!==null).map(p=>({p,d:daysUntil(p.expiry)})).filter(x=>x.d<=60).sort((a,b)=>a.d-b.d);
+  return {days,units,costVal,retailVal,cats,out,low,best,dead,expiring};
 }
 function stockReportPanel(){
   const d=stockReportData();
@@ -1331,6 +1346,9 @@ function stockReportPanel(){
     </div>
   </div>
 
+  ${d.expiring.length?`<div class="panel" style="margin-top:16px"><div class="pt"><h3>Expiry watch</h3><span class="badge" style="background:#fdecea;color:var(--stop)">${d.expiring.filter(x=>x.d<0).length} expired · ${d.expiring.filter(x=>x.d>=0).length} soon</span></div>
+    ${d.expiring.map(x=>{ const exp=x.d<0; const soon=x.d>=0&&x.d<=30; const col=exp?'var(--stop)':(soon?'var(--sun-d)':'var(--mut)'); const when=exp?('Expired '+niceDate(x.p.expiry)):(x.d===0?'Expires today':('Expires '+niceDate(x.p.expiry)+' ('+x.d+' days)')); return `<div class="set-row" style="padding:9px 20px"><div style="min-width:0"><div class="t" style="font-size:13.5px">${cap(x.p.n,40)}</div><div class="d">${x.p.s} in stock · ${x.p.sku||''}</div></div><div class="val num" style="color:${col};font-weight:800">${when}</div></div>`; }).join('')}
+  </div>`:''}
   <div class="panel" style="margin-top:16px"><div class="pt"><h3>Stock movement trail</h3><span class="badge">${movementsLoaded?MOVEMENTS.length+' most recent':'loading…'}</span></div>
     ${!movementsLoaded?'<div style="padding:20px;color:var(--mut);font-weight:600">Loading the movement history…</div>':(MOVEMENTS.length?`<div class="list">${MOVEMENTS.slice(0,60).map(m=>{ const mt=mtypes[m.type]||[m.type,'var(--ink2)']; const t=(m.at||'').slice(0,16).replace('T',' '); return `<div class="set-row" style="padding:9px 20px"><div style="min-width:0"><div class="t" style="font-size:13px">${cap(m.product,38)}</div><div class="d">${t}${m.user?' · '+m.user:''}${m.ref?' · '+m.ref:''}</div></div><div class="val" style="gap:8px"><span class="pill" style="background:${mt[1]}22;color:${mt[1]}">${mt[0]}</span><span class="num" style="font-weight:800;color:${m.qty<0?'var(--stop)':'var(--mpesa)'}">${m.qty>0?'+':''}${m.qty}</span></div></div>`; }).join('')}</div>`:'<div style="padding:20px;color:var(--mut);font-weight:600">No stock movements recorded yet.</div>')}
   </div>`;
@@ -1382,6 +1400,8 @@ function stockReportDocHTML(){
     <div><h2>Top sellers (${d.days}d)</h2>${list(d.best,x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.sold} sold</td></tr>`)}</div>
     <div><h2>Not selling (in stock)</h2>${list(d.dead,x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.p.s} left</td></tr>`)}</div>
   </div>
+  ${d.expiring.length?`<h2>Expiry watch (${d.expiring.filter(x=>x.d<0).length} expired, ${d.expiring.filter(x=>x.d>=0).length} soon)</h2>
+  <table><tr><th>Item</th><th class=n>In stock</th><th>Status</th></tr>${d.expiring.map(x=>`<tr><td>${cap(x.p.n,34)}</td><td class=n>${x.p.s}</td><td>${x.d<0?('Expired '+esc(niceDate(x.p.expiry))):(x.d===0?'Expires today':('Expires '+esc(niceDate(x.p.expiry))+', '+x.d+'d'))}</td></tr>`).join('')}</table>`:''}
   <h2>Recent stock movements</h2>
   ${movementsLoaded&&MOVEMENTS.length?`<table><tr><th>Item</th><th>Type</th><th class=n>Qty</th><th>When</th><th>Who</th></tr>${MOVEMENTS.slice(0,80).map(m=>`<tr><td>${cap(m.product,30)}</td><td>${esc(m.type)}</td><td class=n>${m.qty>0?'+':''}${m.qty}</td><td>${esc((m.at||'').slice(0,16))}</td><td>${esc(m.user||'')}</td></tr>`).join('')}</table>`:'<div class=sub>Movement history not loaded.</div>'}
   <div class=sub style="margin-top:14px">Prepared by ${esc(currentUser?currentUser.name:'')}</div>`;
@@ -1691,6 +1711,45 @@ function expenses(){
   </div>`;
 }
 
+/* -------- CUSTOMERS: records + simple loyalty (visits, spend, points) -------- */
+function customers(){
+  const q=custSearch.trim().toLowerCase();
+  const shown=CUSTOMERS.filter(c=>!q||(`${c.name} ${c.phone} ${c.children}`).toLowerCase().includes(q));
+  const totalSpent=CUSTOMERS.reduce((t,c)=>t+(c.spent||0),0);
+  const repeat=CUSTOMERS.filter(c=>c.visits>1).length;
+  const c2=(s,n)=>String(s||'').length>n?String(s).slice(0,n-1)+'…':String(s||'');
+  const form=(c)=>`<div class="co-card" style="margin-bottom:14px"><div class="pt" style="padding:0 0 10px"><h3>${c?'Edit customer':'Add a customer'}</h3></div>
+    <div class="fld"><label>Name</label><input id="cu-name" value="${c?c.name.replace(/"/g,'&quot;'):''}" placeholder="e.g. Mary Wanjiku"></div>
+    <div class="fld"><label>Phone</label><input id="cu-phone" value="${c?c.phone.replace(/"/g,'&quot;'):''}" inputmode="tel" placeholder="07xx xxx xxx"></div>
+    <div class="fld"><label>Children / notes (optional)</label><input id="cu-children" value="${c?(c.children||'').replace(/"/g,'&quot;'):''}" placeholder="e.g. baby girl, 6 months"></div>
+    <div style="display:flex;gap:9px;margin-top:6px"><button class="bigbtn" data-cusave="${c?c.id:'new'}">${stkIcon} ${c?'Save changes':'Add customer'}</button><button class="btn" data-cucancel>Cancel</button></div>
+  </div>`;
+  return `<div class="phead"><h2>Customers</h2></div>
+  <div class="stats">
+    <div class="stat"><div class="l">Customers</div><div class="v num">${CUSTOMERS.length}</div></div>
+    <div class="stat"><div class="l">Repeat buyers</div><div class="v num">${repeat}</div></div>
+    <div class="stat"><div class="l">Total spent by them</div><div class="v num">${money(totalSpent)}</div></div>
+  </div>
+  <div style="display:flex;gap:12px;margin:14px 0;flex-wrap:wrap;align-items:center">
+    <div class="searchwrap" style="flex:1;min-width:200px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input class="search" data-custsearch placeholder="Search by name or phone" value="${custSearch.replace(/"/g,'&quot;')}"></div>
+    ${!custAdd&&custEdit===null?`<button class="btn sun" data-cuadd><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a customer</button>`:''}
+  </div>
+  ${custAdd?form(null):''}
+  ${custEdit!==null?form(CUSTOMERS.find(c=>c.id===custEdit)):''}
+  <div class="panel"><div class="pt"><h3>All customers</h3><span class="badge">${shown.length}</span></div>
+    <div class="list">
+      ${shown.length===0?`<div style="text-align:center;color:var(--mut);padding:30px 16px;font-weight:600">${q?'No customers match that.':'No customers yet. Add your first one, or attach one at the till when you take payment.'}</div>`:''}
+      ${shown.map(c=>`<div class="item-row"><div class="thumb" style="display:grid;place-items:center;background:#eef6f7;color:var(--teal,#0e94ac);font-weight:800">${(c.name||'?')[0].toUpperCase()}</div>
+        <div><div class="ir-nm">${c2(c.name,28)}${c.points>=100?'<span class="pill" style="margin-left:8px;background:#fff4e0;color:var(--sun-d)">★ '+c.points+' pts</span>':''}</div>
+        <div class="ir-sub">${c.phone||'no phone'}${c.children?' · '+c2(c.children,24):''}</div></div>
+        <div class="ir-right"><div style="text-align:right"><div style="font-weight:800">KSh ${money(c.spent)}</div><div class="ir-sub">${c.visits} visit${c.visits===1?'':'s'} · ${c.points} pts</div></div>
+        <div style="display:flex;gap:6px"><button class="btn ghost sm" data-cuedit="${c.id}" style="padding:5px 8px;font-size:12px">Edit</button>${can(7)?`<button class="btn ghost sm" data-cudel="${c.id}" style="padding:5px 8px;font-size:12px;color:var(--stop)">Remove</button>`:''}</div>
+        </div></div>`).join('')}
+    </div>
+  </div>
+  <div style="font-size:12.5px;color:var(--mut);font-weight:600;margin-top:12px;line-height:1.6">Loyalty: customers earn <b>1 point for every KSh 100</b> they spend. A star shows once they reach 100 points, so you can thank your regulars. Attach a customer to a sale on the Take-payment screen and their points build up on their own.</div>`;
+}
+
 /* -------- hardware: printers, scanner, barcode printer -------- */
 let DEVICES = { receipt:{connected:false,method:'usb',name:'',demo:false}, label:{connected:false,size:'40 x 30 mm',name:'',demo:false}, scanner:{enabled:true} };
 let lastScan='';
@@ -1726,6 +1785,46 @@ function printHTML(title, body, css){
   const go=()=>{ setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ toast('Could not open the print dialog',true); } setTimeout(()=>f.remove(),1500); }, 200); };
   if(doc.readyState==='complete') go(); else f.onload=go;
 }
+
+/* ---- direct printing via the local print agent (raw ESC/POS, no browser dialog) ---- */
+function agentUrl(){ return 'http://localhost:'+(((SETTINGS.agent_port||'')+'').trim()||'9110'); }
+function bytesToB64(bytes){ let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); }
+// Build a plain ESC/POS receipt (bytes) sized to the paper width from Settings.
+function escposReceipt(t){ t=t||TXNS[0]||{}; const W=receiptWmm()===58?32:48; const out=[];
+  const put=(...b)=>{for(const x of b)out.push(x&0xff);};
+  const txt=s=>{ s=String(s==null?'':s).normalize('NFKD').replace(/[^\x20-\x7e]/g,''); for(let i=0;i<s.length;i++)out.push(s.charCodeAt(i)&0x7f); };
+  const nl=s=>{ if(s!=null)txt(s); out.push(0x0A); };
+  const row=(l,r)=>{ l=String(l); r=String(r); const sp=Math.max(1,W-l.length-r.length); nl(l+' '.repeat(sp)+r); };
+  put(0x1B,0x40); put(0x1B,0x61,0x01);
+  put(0x1B,0x21,0x30); nl(SHOP.name); put(0x1B,0x21,0x00);
+  nl(SHOP.branch+', Nairobi'); nl('Till '+SHOP.till);
+  put(0x1B,0x61,0x00); nl('-'.repeat(W));
+  row('Receipt', t.ref||'-'); row('Date', new Date().toLocaleString('en-GB'));
+  row('Served by', t.cashier||'-'); row('Customer', t.cust||'Walk-in');
+  nl('-'.repeat(W));
+  (t.items||[]).forEach(it=>{ nl(it[1]+' x '+it[0]); row('','KSh '+money(it[1]*it[2])); });
+  nl('-'.repeat(W));
+  put(0x1B,0x21,0x20); row('TOTAL','KSh '+money(t.amt)); put(0x1B,0x21,0x00);
+  row('Paid by', (t.method||'')+(t.mpesaRef?' '+t.mpesaRef:''));
+  if(t.vat>0) row('Incl VAT','KSh '+money(t.vat));
+  put(0x1B,0x61,0x01); nl(''); nl('Thank you, karibu tena');
+  put(0x0A,0x0A,0x0A,0x0A); put(0x1D,0x56,0x00);
+  return Uint8Array.from(out);
+}
+async function directPrint(kind, bytes){
+  const printer=kind==='label'?((SETTINGS.label_printer||'')+'').trim():((SETTINGS.receipt_printer||'')+'').trim();
+  const res=await fetch(agentUrl()+'/print',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,printer,dataB64:bytesToB64(bytes)})});
+  const j=await res.json(); if(!j.ok) throw new Error(j.error||'print failed'); return true;
+}
+// Print a receipt: straight to the printer via the agent when Direct printing is on, else the browser box.
+async function doPrintReceipt(t, title){ title=title||('Receipt '+((t&&t.ref)||''));
+  if(setOn('direct_print',false)){
+    try{ await directPrint('receipt', escposReceipt(t)); toast('Sent to the printer'); return; }
+    catch(err){ toast('The print agent did not answer, opening the print box',true); }
+  }
+  printHTML(title, thermalReceiptHTML(t), receiptPrintCss());
+}
+async function checkAgent(){ try{ const r=await fetch(agentUrl()+'/health'); const j=await r.json(); return j&&j.ok?j:null; }catch(e){ return null; } }
 
 /* ---- printer calibration (from Settings) ---- */
 const sv=(key,def)=>{ const v=SETTINGS[key]; return (v!==undefined&&v!=='')?v:def; };
@@ -1936,7 +2035,15 @@ function devicesBody(){ const c=caps();
   const capItem=(ok,label)=>`<div class="cap ${ok?'ok':'no'}"><span class="dot"></span>${label} ${ok?'ready':'not here'}</div>`;
   const r=DEVICES.receipt, l=DEVICES.label;
   const someBc=PRODUCTS.slice(0,3).map(p=>p.bc).join(', ');
-  return `<div class="panel"><div class="pt"><h3>What this device supports</h3><span class="badge">Checked live</span></div>
+  return `<div class="panel" style="padding:16px 18px">
+    <div class="pt" style="padding:0 0 12px"><h3>Direct printing</h3>${setOn('direct_print',false)?'<span class="pill ok">On</span>':'<span class="pill warn">Off</span>'}</div>
+    <div class="set-row" style="padding:0"><div><div class="t">Print straight to the printer</div><div class="d">Skip the browser print box. Needs the small print agent running on this PC (see below). If it is off, printing falls back to the print box on its own.</div></div><div class="val"><button class="switch ${setOn('direct_print',false)?'on':''}" data-swkey="direct_print"></button></div></div>
+    <div class="drow" style="margin-top:10px"><input class="sel" data-setval="receipt_printer" placeholder="Receipt printer name" value="${(sv('receipt_printer','')+'').replace(/"/g,'&quot;')}" style="flex:1;min-width:150px"><input class="sel" data-setval="label_printer" placeholder="Label printer name" value="${(sv('label_printer','')+'').replace(/"/g,'&quot;')}" style="flex:1;min-width:150px"></div>
+    <div class="drow" style="margin-top:8px"><input class="sel" data-setval="agent_port" placeholder="Agent port" value="${(sv('agent_port','9110')+'').replace(/"/g,'&quot;')}" style="width:130px"><button class="btn sm" data-checkagent>Check the agent</button></div>
+    <div id="agent-status" style="font-weight:700;font-size:12.5px;color:var(--mut);margin-top:8px">&nbsp;</div>
+    <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:8px;line-height:1.6">On the shop PC, run the print agent (double-click <b>START-PRINT-AGENT.bat</b>, or run <b>node print-agent.js</b>). Tap <b>Check the agent</b> to see the printers it found, type the exact receipt and label printer names above, then turn on "Print straight to the printer" and print a test receipt.</div>
+  </div>
+  <div class="panel"><div class="pt"><h3>What this device supports</h3><span class="badge">Checked live</span></div>
     <div style="padding:16px 18px"><div class="caps">
       ${capItem(c.usb,'USB printers')}${capItem(c.bt,'Bluetooth')}${capItem(c.serial,'Serial')}${capItem(c.camera,'Camera scan')}${capItem(c.api,'Built-in reader')}
     </div><div style="font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">Printing goes through your browser's print box, where <b>you pick which printer</b> to use (a web till cannot list or choose printers by itself). Tip: in Windows, set the receipt printer and the label printer as separate defaults, and each time choose the right one. A USB barcode scanner needs no setup, it types the code straight into the sale.</div></div>
@@ -1968,7 +2075,7 @@ function devicesBody(){ const c=caps();
 }
 
 /* -------- runtime -------- */
-const VIEWS = {sell, checkout, expenses, stock, reports, returns, settings};
+const VIEWS = {sell, checkout, expenses, stock, reports, returns, customers, settings};
 const TITLES = {
   sell:['Good afternoon, Njeri','ilekela Baby & Kids, Utawala'],
   checkout:['Take payment','ilekela Baby & Kids, Utawala'],
@@ -1976,6 +2083,7 @@ const TITLES = {
   stock:['Products and stock','ilekela Baby & Kids, Utawala'],
   reports:['Sales and reports','ilekela Baby & Kids, Utawala'],
   returns:['Returns and swaps','ilekela Baby & Kids, Utawala'],
+  customers:['Customers','ilekela Baby & Kids, Utawala'],
   settings:['Settings','ilekela Baby & Kids, Utawala'],
 };
 let view = 'sell';
@@ -1998,7 +2106,7 @@ function render(){
 document.querySelector('.rail').addEventListener('click',async e=>{
   const b=e.target.closest('.navbtn'); if(b){ view=b.dataset.nav; render();
     // pull fresh data so stock, sales and returns are current even if another device changed them
-    if(['sell','stock','reports','returns','expenses'].includes(view)){ await refreshData(); render(); }
+    if(['sell','stock','reports','returns','expenses','customers'].includes(view)){ await refreshData(); render(); }
   }
 });
 screen.addEventListener('click',async e=>{
@@ -2022,7 +2130,7 @@ screen.addEventListener('click',async e=>{
     else if(a==='discopen'){ discOpen=true; render(); }
     else if(a==='cardsend'){ payStage='cardsent'; render(); }
     else if(a==='paid'){ await finishSale(); }
-    else if(a==='printreceipt'){ printHTML('Receipt '+((TXNS[0]||{}).ref||''), thermalReceiptHTML(TXNS[0]), receiptPrintCss()); }
+    else if(a==='printreceipt'){ doPrintReceipt(TXNS[0]); }
     else if(a==='newsale'){ CART=[]; resetPay(); view='sell'; render(); }
     return;
   }
@@ -2049,6 +2157,17 @@ screen.addEventListener('click',async e=>{
     render(); return;
   }
   const expd=e.target.closest('[data-expdel]'); if(expd){ const item=EXPENSES[+expd.dataset.expdel]; if(item && confirm('Remove this expense?')){ try{ await api('/api/expenses/'+item.id,'DELETE'); EXPENSES=EXPENSES.filter(x=>x!==item); toast('Expense removed'); }catch(err){ toast('Could not remove it',true); } render(); } return; }
+
+  // customers + loyalty
+  const cua=e.target.closest('[data-cuadd]'); if(cua){ custAdd=true; custEdit=null; render(); return; }
+  const cuc=e.target.closest('[data-cucancel]'); if(cuc){ custAdd=false; custEdit=null; render(); return; }
+  const cue=e.target.closest('[data-cuedit]'); if(cue){ custEdit=+cue.dataset.cuedit; custAdd=false; render(); return; }
+  const cus=e.target.closest('[data-cusave]'); if(cus){ const gv=id=>((document.getElementById(id)||{}).value||'').trim();
+    const name=gv('cu-name'); if(!name){ toast('Enter a name',true); return; }
+    const body={name,phone:gv('cu-phone'),children:gv('cu-children')};
+    try{ if(cus.dataset.cusave==='new'){ const r=await api('/api/customers','POST',body); if(r.customers)CUSTOMERS=r.customers; toast('Customer added'); } else { const r=await api('/api/customers/'+cus.dataset.cusave,'PATCH',body); if(r.customers)CUSTOMERS=r.customers; toast('Customer saved'); } custAdd=false; custEdit=null; }
+    catch(err){ toast(err.message||'Could not save the customer',true); } render(); return; }
+  const cud=e.target.closest('[data-cudel]'); if(cud){ const c=CUSTOMERS.find(x=>x.id===+cud.dataset.cudel); if(c && confirm('Remove '+c.name+'? Their sales stay, only the record goes.')){ try{ const r=await api('/api/customers/'+c.id,'DELETE'); if(r.customers)CUSTOMERS=r.customers; toast('Customer removed'); }catch(err){ toast('Could not remove',true); } render(); } return; }
 
   // returns: record / approve / swap
   const nr=e.target.closest('[data-newreturn]'); if(nr){ newReturnOpen=!newReturnOpen; if(!newReturnOpen) returnFromSale=null; render(); if(newReturnOpen) window.scrollTo(0,0); return; }
@@ -2119,7 +2238,7 @@ screen.addEventListener('click',async e=>{
     }
     const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:npImages[0]||'', images:[...npImages],
-      online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
+      online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false, expiry_date:(g('np-expiry')&&g('np-expiry').value)||null };
     try{ const r=await api('/api/products','POST',body); PRODUCTS.unshift(r.product); }
     catch(err){ toast('Could not save the product',true); return; }
     addingProduct=false; render(); return;
@@ -2172,13 +2291,18 @@ screen.addEventListener('click',async e=>{
   // settings and generic controls
   const set=e.target.closest('[data-set]'); if(set){setTab=set.dataset.set; render(); return;}
   // settings: save the VAT rate to the server
-  const trc=e.target.closest('[data-testreceipt]'); if(trc){ const sample=TXNS[0]||{t:new Date().toTimeString().slice(0,5),ref:'TEST',cust:'Walk-in',method:'Cash',amt:1500,vat:0,cashier:currentUser?currentUser.name:'',items:[['Sample item',1,1500],['Another item',2,500]]}; printHTML('Test receipt', thermalReceiptHTML(sample), receiptPrintCss()); return; }
+  const cka=e.target.closest('[data-checkagent]'); if(cka){ const el=document.getElementById('agent-status'); if(el){ el.textContent='Checking…'; el.style.color='var(--mut)'; } const h=await checkAgent(); if(el){ if(h){ el.style.color='var(--mpesa)'; el.textContent='Agent is on. Printers found: '+((h.printers||[]).slice(0,10).join(', ')||'none'); } else { el.style.color='var(--stop)'; el.textContent='No agent at '+agentUrl()+'. Start the print agent on this PC.'; } } return; }
+  const trc=e.target.closest('[data-testreceipt]'); if(trc){ const sample=TXNS[0]||{t:new Date().toTimeString().slice(0,5),ref:'TEST',cust:'Walk-in',method:'Cash',amt:1500,vat:0,cashier:currentUser?currentUser.name:'',items:[['Sample item',1,1500],['Another item',2,500]]}; doPrintReceipt(sample,'Test receipt'); return; }
   const tlb=e.target.closest('[data-testlabel]'); if(tlb){ const p=PRODUCTS[0]; if(!p){ toast('Add a product first',true); return; } printHTML('Test label', labelSheetHTML(p,1), labelPrintCss()); return; }
   const cu=e.target.closest('[data-cashup]'); if(cu){ openCashup(); return; }
   const zr=e.target.closest('[data-zreport]'); if(zr){ printHTML('Z report', zReportHTML(), receiptPrintCss()); toast('Z report ready to print'); return; }
-  const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); printHTML('Receipt '+(t?t.ref:''), thermalReceiptHTML(t), receiptPrintCss()); return; }
+  const rp=e.target.closest('[data-reprint]'); if(rp){ const t=TXNS.find(x=>String(x.ref)===String(rp.dataset.reprint)); doPrintReceipt(t); return; }
   const sret=e.target.closest('[data-startreturn]'); if(sret){ const ref=sret.dataset.startreturn; returnFromSale=TXNS.find(x=>String(x.ref)===String(ref))||null; newReturnOpen=true; view='returns'; render(); window.scrollTo(0,0); return; }
-  const scst=e.target.closest('[data-setcust]'); if(scst){ const nm=prompt('Customer name for the receipt', saleCustomer?saleCustomer.name:''); if(nm!==null){ const n=nm.trim(); saleCustomer = n ? {name:n, detail:'Added at the till'} : null; render(); } return; }
+  const scst=e.target.closest('[data-setcust]'); if(scst){ const nm=prompt('Customer name or phone (a saved customer earns loyalty points)', saleCustomer?saleCustomer.name:''); if(nm!==null){ const n=nm.trim();
+    if(!n){ saleCustomer=null; } else { const key=n.toLowerCase(); const match=CUSTOMERS.find(c=>(c.phone&&c.phone.replace(/\s/g,'')===n.replace(/\s/g,''))||(c.name&&c.name.toLowerCase()===key));
+      if(match){ saleCustomer={name:match.name, detail:(match.phone||'')+' · '+match.points+' pts', id:match.id}; }
+      else { saleCustomer={name:n, detail:'Not a saved customer (no points). Add them in Customers.', id:null}; } }
+    render(); } return; }
   const svat=e.target.closest('[data-savevat]'); if(svat){ const el=document.getElementById('vatInput'); let v=parseInt((el&&el.value||'').replace(/\D/g,'')); if(!Number.isFinite(v)||v<0||v>100){ toast('VAT rate must be a whole number from 0 to 100',true); if(el)el.focus(); return; } try{ const r=await api('/api/settings','PATCH',{vat_rate:v}); if(r.shop&&r.shop.vat_rate!==undefined)SHOP.vat=Number(r.shop.vat_rate); toast('VAT rate saved: '+SHOP.vat+'%'); }catch(err){ toast('Could not save the VAT rate',true); } render(); return; }
   // stock: change a product's VAT status (standard / exempt)
   const pvat=e.target.closest('[data-prodvat]'); if(pvat){ const id=+pvat.dataset.prodvat; const prod=PRODUCTS.find(x=>x.id===id); if(prod){ const next=prod.vt==='exempt'?'standard':'exempt'; try{ const r=await api('/api/products/'+id,'PATCH',{vat_type:next}); if(r.product){ Object.assign(prod,r.product); } toast(next==='exempt'?'Marked VAT exempt':'Marked standard VAT'); }catch(err){ toast('Could not change VAT status',true); } render(); } return; }
@@ -2188,9 +2312,10 @@ screen.addEventListener('click',async e=>{
   const pcanc=e.target.closest('[data-prodcancel]'); if(pcanc){ editPrice=null; render(); return; }
   const psave=e.target.closest('[data-prodsave]'); if(psave){ const id=+psave.dataset.prodsave; const g=k=>parseInt((document.getElementById('ep-'+k+'-'+id)||{}).value||'',10)||0;
     const p=g('p'), c=g('c'), w=g('w'); const prod=PRODUCTS.find(x=>x.id===id);
+    const expiry=(document.getElementById('ep-exp-'+id)||{}).value||null;
     if(p<=0){ toast('Selling price must be more than 0',true); return; }
     if(c>p) toast('Note: cost is higher than the selling price');
-    try{ const r=await api('/api/products/'+id,'PATCH',{p,c,w}); if(r.product&&prod){ Object.assign(prod,r.product); } editPrice=null; toast('Prices saved'); }
+    try{ const r=await api('/api/products/'+id,'PATCH',{p,c,w,expiry_date:expiry}); if(r.product&&prod){ Object.assign(prod,r.product); } editPrice=null; toast('Saved'); }
     catch(err){ toast('Could not save the prices',true); }
     render(); return;
   }
@@ -2232,7 +2357,7 @@ screen.addEventListener('input',e=>{
   }
   // live product filter as the cashier types in the Sell/Stock search box
   if(e.target.classList&&e.target.classList.contains('search')){
-    if(view==='sell') sellSearch=e.target.value; else if(view==='stock') stockSearch=e.target.value; else return;
+    if(view==='sell') sellSearch=e.target.value; else if(view==='stock') stockSearch=e.target.value; else if(view==='customers') custSearch=e.target.value; else return;
     render();
     const s=screen.querySelector('.search'); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){}}
   }
@@ -2347,7 +2472,7 @@ async function refreshData(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
+    if(d.products)PRODUCTS=d.products; if(d.sales)TXNS=d.sales; if(d.held)HELD=d.held; if(d.returns)RETURNS=d.returns; if(d.expenses)EXPENSES=d.expenses; if(d.cashups)CASHUPS=d.cashups; if(d.customers)CUSTOMERS=d.customers; if(d.intake)INTAKE=d.intake; DELIVERY=d.delivery||DELIVERY; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(e){}
 }
 async function boot(){
@@ -2356,7 +2481,7 @@ async function boot(){
   try{
     const d=await api('/api/bootstrap');
     if(d.shop){ SETTINGS=d.shop; if(d.shop.shop_name)SHOP.name=d.shop.shop_name; if(d.shop.branch)SHOP.branch=d.shop.branch; if(d.shop.till)SHOP.till=d.shop.till; if(d.shop.kra_pin)SHOP.pin=d.shop.kra_pin; if(d.shop.vat_rate!==undefined&&d.shop.vat_rate!==''){ const v=Number(d.shop.vat_rate); if(Number.isFinite(v))SHOP.vat=v; } }
-    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[]; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
+    PRODUCTS=d.products||[]; TXNS=d.sales||[]; HELD=d.held||[]; ORDERS=d.orders||[]; RETURNS=d.returns||[]; INTAKE=d.intake||[]; DELIVERY=d.delivery||null; STAFF_LIST=d.staff||[]; EXPENSES=d.expenses||[]; CASHUPS=d.cashups||[]; CUSTOMERS=d.customers||[]; AI_TITLES=!!d.aiTitles; BG_REMOVAL=!!d.bgRemoval; if(d.aiModel)AI_MODEL=d.aiModel;
   }catch(err){ toast('Cannot reach the till server. Changes will not be saved.',true); }
   // Stay signed in through a refresh: restore the last signed-in user if there is one.
   try{ const saved=localStorage.getItem('babypos_user'); if(saved){ currentUser=JSON.parse(saved); const first=allowedNav()[0]; view=first?first.key:'sell'; } }catch(e){}

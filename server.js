@@ -174,6 +174,7 @@ const TOGGLE_KEYS = [
   'etims_receipts', 'receipt_whatsapp',
   'chan_tiktok', 'chan_whatsapp_catalogue', 'chan_hide_out_of_stock', 'chan_next_size_reminder',
   'warn_low_stock', 'must_count_cash',
+  'direct_print',
 ];
 
 // ---------------------------------------------------------------
@@ -188,7 +189,8 @@ function productOut(r) {
            sizes: safeArr(r.sizes), colours: safeArr(r.colours),
            wasPrice: r.was_price || null, image: r.image || '', images: safeArr(r.images),
            online: r.online == null ? 1 : r.online, featured: r.featured ? 1 : 0,
-           dg: r.design_group || null, sizeLabel: r.size_label || null };
+           dg: r.design_group || null, sizeLabel: r.size_label || null,
+           expiry: r.expiry_date || null };
 }
 function safeArr(s) { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 
@@ -255,6 +257,30 @@ function addExpense(body) {
 }
 function allSales() {
   return db.prepare('SELECT * FROM sales ORDER BY datetime DESC, id DESC').all().map(saleOut);
+}
+// --- customers + simple loyalty (visits, lifetime spend, points = 1 per KSh 100) ---
+function customerOut(c) {
+  const agg = db.prepare("SELECT COUNT(*) AS visits, COALESCE(SUM(total),0) AS spent, MAX(datetime) AS last FROM sales WHERE customer_id = ? AND status = 'paid'").get(c.id);
+  const spent = agg.spent || 0;
+  return { id: c.id, name: c.name || '', phone: c.phone || '', children: c.children || '',
+           visits: agg.visits || 0, spent, points: Math.floor(spent / 100), last: agg.last || null };
+}
+function allCustomers() {
+  return db.prepare('SELECT * FROM customers ORDER BY name COLLATE NOCASE').all().map(customerOut);
+}
+function addCustomer(body) {
+  const id = db.prepare('INSERT INTO customers (name, phone, children, created_at) VALUES (?, ?, ?, ?)')
+    .run(String(body.name || '').trim() || 'Customer', String(body.phone || '').trim(), String(body.children || '').trim(), now()).lastInsertRowid;
+  return customerOut(db.prepare('SELECT * FROM customers WHERE id = ?').get(id));
+}
+function updateCustomer(id, body) {
+  const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
+  if (!c) return null;
+  db.prepare('UPDATE customers SET name = ?, phone = ?, children = ? WHERE id = ?').run(
+    body.name !== undefined ? String(body.name).trim() : c.name,
+    body.phone !== undefined ? String(body.phone).trim() : c.phone,
+    body.children !== undefined ? String(body.children).trim() : c.children, id);
+  return customerOut(db.prepare('SELECT * FROM customers WHERE id = ?').get(id));
 }
 // --- till-close cash counts (the Z report's record) ---
 function cashupOut(r) {
@@ -492,11 +518,12 @@ function recordSale(body) { return transaction(() => {
   const dt = localStamp();
 
   const saleId = db.prepare(
-    `INSERT INTO sales (ref, datetime, cashier, customer, subtotal, discount_pct, discount_amount, vat, total, method, split_parts, status, channel, mpesa_ref)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`
+    `INSERT INTO sales (ref, datetime, cashier, customer, subtotal, discount_pct, discount_amount, vat, total, method, split_parts, status, channel, mpesa_ref, customer_id, branch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?)`
   ).run(ref, dt, body.cashier || null, body.customer || 'Walk-in', subtotal, discPct, discAmount, vat, total,
         method, body.splitParts ? JSON.stringify(body.splitParts) : null, body.channel || 'counter',
-        body.mpesaRef ? String(body.mpesaRef).trim().toUpperCase() : null).lastInsertRowid;
+        body.mpesaRef ? String(body.mpesaRef).trim().toUpperCase() : null,
+        Number(body.customerId) || null, getSetting('branch', 'Utawala')).lastInsertRowid;
 
   const insLine = db.prepare(
     `INSERT INTO sale_lines (sale_id, product_id, name, age_range, qty, unit_price) VALUES (?, ?, ?, ?, ?, ?)`);
@@ -595,6 +622,7 @@ function addProduct(body) {
   const bc = '629' + String(1041500 + (id * 137)).slice(-7);
   const finalSku = sku || ('ILK-' + String(id).padStart(5, '0'));
   db.prepare('UPDATE products SET barcode = ?, sku = ? WHERE id = ?').run(bc, finalSku, id);
+  if (body.expiry_date) db.prepare('UPDATE products SET expiry_date = ? WHERE id = ?').run(String(body.expiry_date).slice(0, 10), id);
   if (Number(body.s) > 0) {
     db.prepare(`INSERT INTO stock_movements (product_id, type, qty, ref, datetime, user) VALUES (?, 'adjust', ?, 'opening', ?, ?)`)
       .run(id, Number(body.s), now(), body.cashier || null);
@@ -695,6 +723,7 @@ const server = http.createServer(async (req, res) => {
         delivery: del.delivery,
         expenses: allExpenses(),
         cashups: allCashups(),
+        customers: allCustomers(),
         aiTitles: aiEnabled(),
         bgRemoval: bgEnabled(),
         aiModel: (aiConfig() || {}).model || 'claude-haiku-4-5',
@@ -773,6 +802,26 @@ const server = http.createServer(async (req, res) => {
     // Stock movement / audit trail for the Stock report (?limit=NNN, newest first).
     if (p === '/api/movements' && method === 'GET') {
       return sendJSON(res, 200, { movements: allMovements(url.searchParams.get('limit')) });
+    }
+
+    // Customers + loyalty.
+    if (p === '/api/customers' && method === 'POST') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: 'You are not allowed to add customers' });
+      const body = await readBody(req);
+      return sendJSON(res, 200, { customer: addCustomer(body), customers: allCustomers() });
+    }
+    const custM = p.match(/^\/api\/customers\/(\d+)$/);
+    if (custM && method === 'PATCH') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: 'You are not allowed to edit customers' });
+      const body = await readBody(req);
+      const c = updateCustomer(Number(custM[1]), body);
+      if (!c) return sendJSON(res, 404, { error: 'no such customer' });
+      return sendJSON(res, 200, { customer: c, customers: allCustomers() });
+    }
+    if (custM && method === 'DELETE') {
+      if (!hasRight(req, 7)) return sendJSON(res, 403, { error: 'Only a manager can remove a customer' });
+      db.prepare('DELETE FROM customers WHERE id = ?').run(Number(custM[1]));
+      return sendJSON(res, 200, { customers: allCustomers() });
     }
 
     // Record an end-of-day cash count (the Z report). Returns the saved count + recent history.
@@ -932,7 +981,7 @@ const server = http.createServer(async (req, res) => {
         setSetting('opening_float', f);
       }
       // Free-value settings (printer calibration, etc.) stored as strings.
-      ['receipt_width', 'receipt_text', 'label_size'].forEach(k => {
+      ['receipt_width', 'receipt_text', 'label_size', 'receipt_printer', 'label_printer', 'agent_port'].forEach(k => {
         if (body[k] !== undefined) setSetting(k, String(body[k]));
       });
       return sendJSON(res, 200, { shop: settingsOut() });
@@ -1026,6 +1075,7 @@ const server = http.createServer(async (req, res) => {
       if (body.images !== undefined) { const arr = Array.isArray(body.images) ? body.images.filter(Boolean) : []; set('images', JSON.stringify(arr)); set('image', arr[0] || null); }
       if (body.online !== undefined) set('online', (body.online === true || body.online === 1 || body.online === '1') ? 1 : 0);
       if (body.featured !== undefined) set('featured', (body.featured === true || body.featured === 1 || body.featured === '1') ? 1 : 0);
+      if (body.expiry_date !== undefined) set('expiry_date', body.expiry_date ? String(body.expiry_date).slice(0, 10) : null);
       return sendJSON(res, 200, { product: productOut(db.prepare('SELECT * FROM products WHERE id = ?').get(prod.id)) });
     }
     if ((m = p.match(/^\/api\/deliveries\/(\d+)\/accept$/)) && method === 'POST') {
@@ -1069,6 +1119,15 @@ const server = http.createServer(async (req, res) => {
       const ext = (name.split('.').pop() || '').toLowerCase();
       res.writeHead(200, { 'Content-Type': EXT_MIME[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': '*' });
       return res.end(fs.readFileSync(file));
+    }
+
+    // ---- download the local print agent (for the shop PC) ----
+    if ((p === '/print-agent.js' || p === '/print-agent.bat' || p === '/START-PRINT-AGENT.bat' || p === '/START-PRINT-AGENT.md') && method === 'GET') {
+      const name = p === '/print-agent.bat' ? 'START-PRINT-AGENT.bat' : path.basename(p);
+      const f = [path.join(__dirname, name), path.join(__dirname, '..', name)].find(x => fs.existsSync(x));
+      if (!f) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="' + name + '"' });
+      return res.end(fs.readFileSync(f));
     }
 
     // ---- static: the prototype HTML ----

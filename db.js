@@ -229,6 +229,10 @@ ensureColumn('products', 'wholesale_price', 'INTEGER NOT NULL DEFAULT 0');  // b
 ensureColumn('sales', 'mpesa_ref', 'TEXT');  // customer's M-PESA confirmation code, when entered manually
 ensureColumn('products', 'design_group', 'TEXT');  // groups the sizes of one design (a size series); null = a plain single product
 ensureColumn('products', 'size_label', 'TEXT');    // this item's size within its series (e.g. an age like 3); null = not a series item
+ensureColumn('products', 'expiry_date', 'TEXT');   // YYYY-MM-DD for perishables (formula, wipes, skincare); null = does not expire
+ensureColumn('sales', 'customer_id', 'INTEGER');   // links a sale to a customer record for loyalty; null = walk-in
+ensureColumn('sales', 'branch', 'TEXT');           // which branch the sale happened at (groundwork for a 2nd shop)
+ensureColumn('customers', 'created_at', 'TEXT');   // when the customer was first added
 ensureColumn('returns', 'sale_ref', 'TEXT');  // links a return back to the original sale receipt
 
 // ---------------------------------------------------------------
