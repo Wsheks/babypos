@@ -561,6 +561,15 @@ function addProduct(body) {
   return productOut(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
 }
 
+// Turn a size label ("6-18m", "3y", "0-3m") into a readable age range for the website age filter.
+function seriesAgeRange(label) {
+  const s = String(label || '').trim();
+  let m = s.match(/^(\d+)\s*-\s*(\d+)\s*m/i); if (m) return m[1] + ' to ' + m[2] + ' months';
+  m = s.match(/^(\d+)\s*m/i); if (m) return m[1] + ' months';
+  m = s.match(/^(\d+)\s*-\s*(\d+)\s*y/i); if (m) return m[1] + ' to ' + m[2] + ' years';
+  m = s.match(/^(\d+)\s*y?$/i); if (m) return m[1] + ' years';
+  return s;
+}
 // Create a size series: one design, several sizes (ages), each its own stock item + barcode,
 // all sharing a design_group so the website can group them into one product with a size picker.
 function addSeries(body) { return transaction(() => {
@@ -573,7 +582,7 @@ function addSeries(body) { return transaction(() => {
   sizes.forEach(s => {
     const age = String(s.age).trim();
     const prod = addProduct({
-      n: body.n, a: age + ' years', category: body.category,
+      n: body.n, a: seriesAgeRange(age), category: body.category,
       c: body.c, p: body.p, w: body.w,
       s: Math.max(0, Math.round(Number(s.stock) || 0)),
       vat_type: body.vat_type, sizes: [age], colours: body.colours,

@@ -894,7 +894,7 @@ function sell(){
         ${(()=>{ const q=sellSearch.trim().toLowerCase(); const cards=PRODUCTS.map((p,i)=> (q && !(`${p.n} ${p.a||''} ${p.sku||''} ${p.category||''}`).toLowerCase().includes(q)) ? '' : `<button class="pcard" data-add="${i}">
           <div class="pic">${prodPic(p)}</div>
           <div class="nm">${p.n}</div>
-          <div class="age">${p.sizeLabel?('Age '+p.sizeLabel):p.a}</div>
+          <div class="age">${p.sizeLabel||p.a}</div>
           <div class="foot">
             <div class="pr">${money(p.p)}</div>
             <span class="stk ${p.s<5?'low':''}">${p.s} left</span>
@@ -1193,9 +1193,14 @@ function productsPanel(){
         <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:700"><input type="checkbox" id="np-series"> This design comes in several sizes (a series)</label>
         <div id="np-single-stock" style="margin-top:8px"><label style="display:block;font-weight:600;color:var(--mut);font-size:12.5px;margin-bottom:4px">Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric" style="width:100%"></div>
         <div id="np-series-grid" style="display:none;margin-top:8px">
-          <div style="font-weight:600;color:var(--mut);font-size:12.5px;margin-bottom:8px">How many of each age did you get? Fill only the sizes you have. Each age becomes its own item with its own barcode, and the website shows them as one design with a size picker.</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px">
-            ${[0,1,2,3,4,5,6,7,8].map(a=>`<div style="text-align:center"><div style="font-weight:700;font-size:12px;margin-bottom:3px">Age ${a}</div><input data-seriesage="${a}" inputmode="numeric" placeholder="0" style="width:100%;text-align:center;padding:9px 4px;border:2px solid var(--line2);border-radius:9px;font:inherit;font-weight:700"></div>`).join('')}
+          <div style="font-weight:600;color:var(--mut);font-size:12.5px;margin-bottom:8px">How many of each size did you get? Fill only the sizes this design came in (months or years). Each becomes its own item with its own barcode, and the website shows them as one design with a size picker.</div>
+          <div style="font-weight:800;font-size:12px;color:var(--ink2);margin:2px 0 6px">Months</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(76px,1fr));gap:8px;margin-bottom:14px">
+            ${['0-3m','3-6m','6-9m','9-12m','12-18m','18-24m','6-18m','6-24m'].map(lbl=>`<div style="text-align:center"><div style="font-weight:700;font-size:12px;margin-bottom:3px">${lbl}</div><input data-seriesage="${lbl}" inputmode="numeric" placeholder="0" style="width:100%;text-align:center;padding:9px 4px;border:2px solid var(--line2);border-radius:9px;font:inherit;font-weight:700"></div>`).join('')}
+          </div>
+          <div style="font-weight:800;font-size:12px;color:var(--ink2);margin:2px 0 6px">Years</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(66px,1fr));gap:8px">
+            ${['1y','2y','3y','4y','5y','6y','7y','8y'].map(lbl=>`<div style="text-align:center"><div style="font-weight:700;font-size:12px;margin-bottom:3px">${lbl}</div><input data-seriesage="${lbl}" inputmode="numeric" placeholder="0" style="width:100%;text-align:center;padding:9px 4px;border:2px solid var(--line2);border-radius:9px;font:inherit;font-weight:700"></div>`).join('')}
           </div>
         </div>
       </div>
@@ -1243,7 +1248,7 @@ function productsPanel(){
       ${shownProds.map(pr=>`<div class="item-row">
         <div class="thumb">${prodPic(pr)}</div>
         <div>
-          <div class="ir-nm">${pr.n}${pr.sizeLabel?'<span class="pill" style="margin-left:8px;background:var(--teal-t,#e2f4f7);color:var(--teal,#0e94ac)">Age '+pr.sizeLabel+'</span>':''}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
+          <div class="ir-nm">${pr.n}${pr.sizeLabel?'<span class="pill" style="margin-left:8px;background:var(--teal-t,#e2f4f7);color:var(--teal,#0e94ac)">'+pr.sizeLabel+'</span>':''}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
         </div>
         <div class="ir-right">
