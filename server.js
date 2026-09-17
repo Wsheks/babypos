@@ -322,6 +322,47 @@ function isOwnerRequest(req) {
   const s = sessionOf(req);
   return !!(s && s.role === 'Owner');
 }
+// --- password hashing (scrypt, no npm) ---
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 32).toString('hex');
+  return 'scrypt$' + salt + '$' + hash;
+}
+function verifyPassword(pw, stored) {
+  stored = String(stored || '');
+  if (stored.startsWith('scrypt$')) {
+    const parts = stored.split('$');
+    const salt = parts[1], hash = parts[2];
+    if (!salt || !hash) return false;
+    const calc = crypto.scryptSync(String(pw), salt, 32).toString('hex');
+    const a = Buffer.from(hash, 'hex'), b = Buffer.from(calc, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+  return stored === String(pw);   // legacy plaintext (upgraded on next successful login)
+}
+// --- server-side permissions: the same rights matrix the client uses, enforced for real ---
+// roles: 0 Owner, 1 Manager, 2 Cashier, 3 Stock clerk, 4 Rider
+const SRV_ROLES = ['Owner', 'Manager', 'Cashier', 'Stock clerk', 'Rider'];
+const SRV_RIGHTS = [
+  [1, 1, 1, 0, 0], // 0 sell / take payment
+  [1, 1, 0, 0, 0], // 1 discount over 10%
+  [1, 1, 0, 0, 0], // 2 cancel a sale / remove
+  [1, 1, 0, 1, 0], // 3 accept a delivery
+  [1, 1, 0, 0, 0], // 4 set price / manage products
+  [1, 1, 0, 0, 0], // 5 approve a return
+  [1, 1, 0, 0, 0], // 6 refund
+  [1, 1, 0, 0, 0], // 7 see cost & profit / manager area (expenses, settings)
+  [1, 1, 1, 0, 0], // 8 close the day
+  [1, 0, 0, 0, 0], // 9 staff management (owner only)
+];
+function roleAllows(role, rightIndex) {
+  const ri = SRV_ROLES.indexOf(role);
+  return ri >= 0 && !!(SRV_RIGHTS[rightIndex] && SRV_RIGHTS[rightIndex][ri]);
+}
+function hasRight(req, rightIndex) {
+  const s = sessionOf(req);
+  return !!(s && roleAllows(s.role, rightIndex));
+}
 function orderOut(o) {
   return { id: o.id, ch: o.channel, cust: o.customer, area: o.area,
            items: JSON.parse(o.items || '[]'), amt: o.amount,
@@ -683,6 +724,7 @@ const server = http.createServer(async (req, res) => {
 
     // Upload a photo with its background removed (via remove.bg). Returns the saved URL.
     if (p === '/api/upload-nobg' && method === 'POST') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: "Only a manager can add product photos" });
       const cfg = aiConfig();
       if (!cfg || !cfg.removebg_key) return sendJSON(res, 200, { ok: false, error: 'Background removal is not set up yet' });
       const body = await readBody(req);
@@ -700,6 +742,7 @@ const server = http.createServer(async (req, res) => {
 
     // Suggest a product title from an outfit photo (AI vision). Returns { ok, title } or { ok:false, error }.
     if (p === '/api/suggest-title' && method === 'POST') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: "Only a manager can name products" });
       const cfg = aiConfig();
       if (!cfg || !cfg.key) return sendJSON(res, 200, { ok: false, notConfigured: true, error: 'AI naming is not set up yet' });
       const body = await readBody(req);
@@ -734,12 +777,14 @@ const server = http.createServer(async (req, res) => {
 
     // Record an end-of-day cash count (the Z report). Returns the saved count + recent history.
     if (p === '/api/cashup' && method === 'POST') {
+      if (!hasRight(req, 8)) return sendJSON(res, 403, { error: "You are not allowed to close the day" });
       const body = await readBody(req);
       return sendJSON(res, 200, { cashup: addCashup(body), cashups: allCashups() });
     }
 
     // Upload a product photo (sent as a data URL). Saves a file and returns its URL.
     if (p === '/api/upload' && method === 'POST') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: "Only a manager can add product photos" });
       const body = await readBody(req);
       const m = String(body.data || '').match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
       if (!m) return sendJSON(res, 400, { error: 'Not a valid image' });
@@ -755,22 +800,26 @@ const server = http.createServer(async (req, res) => {
 
     // Returns and swaps.
     if (p === '/api/returns' && method === 'POST') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: "You are not allowed to record returns" });
       const body = await readBody(req);
       return sendJSON(res, 200, { returns: addReturn(body), products: allProducts() });
     }
     const retDecide = p.match(/^\/api\/returns\/(\d+)$/);
     if (retDecide && method === 'PATCH') {
+      if (!hasRight(req, 5)) return sendJSON(res, 403, { error: "Only a manager can approve or change a return" });
       const body = await readBody(req);
       return sendJSON(res, 200, { returns: decideReturn(Number(retDecide[1]), body), products: allProducts() });
     }
 
     // Expenses (shop running costs). Recording gated on the client to owner/manager.
     if (p === '/api/expenses' && method === 'POST') {
+      if (!hasRight(req, 7)) return sendJSON(res, 403, { error: "Only a manager can record expenses" });
       const body = await readBody(req);
       return sendJSON(res, 200, { expense: addExpense(body) });
     }
     const expDel = p.match(/^\/api\/expenses\/(\d+)$/);
     if (expDel && method === 'DELETE') {
+      if (!hasRight(req, 7)) return sendJSON(res, 403, { error: "Only a manager can remove an expense" });
       db.prepare('DELETE FROM expenses WHERE id = ?').run(Number(expDel[1]));
       return sendJSON(res, 200, { ok: true });
     }
@@ -783,8 +832,8 @@ const server = http.createServer(async (req, res) => {
       const next = String(body.newPassword || '');
       if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
       const row = db.prepare('SELECT * FROM staff WHERE lower(username) = ?').get(uname);
-      if (!row || row.password !== cur) return sendJSON(res, 401, { error: 'Your current password is wrong' });
-      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(next, row.id);
+      if (!row || !verifyPassword(cur, row.password)) return sendJSON(res, 401, { error: 'Your current password is wrong' });
+      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(hashPassword(next), row.id);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -793,7 +842,9 @@ const server = http.createServer(async (req, res) => {
       const uname = String(body.username || '').trim().toLowerCase();
       const pw = String(body.password || '');
       const row = db.prepare('SELECT * FROM staff WHERE lower(username) = ?').get(uname);
-      if (!row || row.password !== pw) return sendJSON(res, 401, { error: 'Wrong username or password' });
+      if (!row || !verifyPassword(pw, row.password)) return sendJSON(res, 401, { error: 'Wrong username or password' });
+      // Lazily upgrade any legacy plaintext password to a hash on successful login.
+      if (!String(row.password).startsWith('scrypt$')) db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(hashPassword(pw), row.id);
       const token = createSession(row.username, row.role);
       return sendJSON(res, 200, { user: { name: row.name, role: row.role, c: row.color, username: row.username }, token });
     }
@@ -833,18 +884,20 @@ const server = http.createServer(async (req, res) => {
       if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
       const row = db.prepare('SELECT * FROM resets WHERE token = ?').get(token);
       if (!row || new Date(row.expires_at) < new Date()) return sendJSON(res, 400, { error: 'This reset link has expired or is invalid. Request a new one.' });
-      db.prepare('UPDATE staff SET password = ? WHERE lower(username) = ?').run(next, row.username.toLowerCase());
+      db.prepare('UPDATE staff SET password = ? WHERE lower(username) = ?').run(hashPassword(next), row.username.toLowerCase());
       db.prepare('DELETE FROM resets WHERE username = ?').run(row.username);
       db.prepare('DELETE FROM sessions WHERE username = ?').run(row.username);  // log out old sessions
       return sendJSON(res, 200, { ok: true, username: row.username });
     }
 
     if (p === '/api/sales' && method === 'POST') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: "You are not allowed to take payment" });
       const body = await readBody(req);
       return sendJSON(res, 200, recordSale(body));
     }
 
     if (p === '/api/products' && method === 'POST') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: "Only a manager can add products" });
       const body = await readBody(req);
       if (!body.n || !String(body.n).trim()) return sendJSON(res, 400, { error: 'name required' });
       return sendJSON(res, 200, { product: addProduct(body) });
@@ -852,6 +905,7 @@ const server = http.createServer(async (req, res) => {
 
     // Add a size series: one design, several sizes (ages), each its own stock item.
     if (p === '/api/products/series' && method === 'POST') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: "Only a manager can add products" });
       const body = await readBody(req);
       if (!body.n || !String(body.n).trim()) return sendJSON(res, 400, { error: 'name required' });
       if (!Array.isArray(body.sizes) || !body.sizes.length) return sendJSON(res, 400, { error: 'add at least one size' });
@@ -860,6 +914,7 @@ const server = http.createServer(async (req, res) => {
 
     // Save shop settings (whitelisted so unknown keys are ignored).
     if (p === '/api/settings' && method === 'PATCH') {
+      if (!hasRight(req, 7)) return sendJSON(res, 403, { error: "Only a manager can change settings" });
       const body = await readBody(req);
       if (body.vat_rate !== undefined) {
         const r = Math.round(Number(body.vat_rate));
@@ -897,6 +952,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(buildCatalogue()));
     }
     if (p === '/api/catalogue/publish' && method === 'POST') {
+      if (!hasRight(req, 7)) return sendJSON(res, 403, { error: "Only a manager can publish the catalogue" });
       const arr = buildCatalogue();
       const dir = path.join(__dirname, 'published');
       fs.mkdirSync(dir, { recursive: true });
@@ -922,7 +978,7 @@ const server = http.createServer(async (req, res) => {
       if (password.length < 4) return sendJSON(res, 400, { error: 'Password must be at least 4 characters' });
       if (db.prepare('SELECT 1 FROM staff WHERE lower(username) = ?').get(username)) return sendJSON(res, 400, { error: 'That username is already taken' });
       db.prepare('INSERT INTO staff (name, username, role, password, color) VALUES (?, ?, ?, ?, ?)')
-        .run(name, username, role, password, body.color || '#ec7060');
+        .run(name, username, role, hashPassword(password), body.color || '#ec7060');
       return sendJSON(res, 200, { staff: allStaffPublic(), added: name });
     }
 
@@ -946,12 +1002,13 @@ const server = http.createServer(async (req, res) => {
       if (next.length < 4) return sendJSON(res, 400, { error: 'New password must be at least 4 characters' });
       const target = db.prepare('SELECT * FROM staff WHERE id = ?').get(Number(m[1]));
       if (!target) return sendJSON(res, 404, { error: 'no such staff member' });
-      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(next, target.id);
+      db.prepare('UPDATE staff SET password = ? WHERE id = ?').run(hashPassword(next), target.id);
       return sendJSON(res, 200, { ok: true, name: target.name });
     }
 
     // Update a product: VAT status, website catalogue fields, online/featured flags.
     if ((m = p.match(/^\/api\/products\/(\d+)$/)) && method === 'PATCH') {
+      if (!hasRight(req, 4)) return sendJSON(res, 403, { error: 'Only a manager can change a product' });
       const body = await readBody(req);
       const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(Number(m[1]));
       if (!prod) return sendJSON(res, 404, { error: 'no such product' });
@@ -972,27 +1029,32 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { product: productOut(db.prepare('SELECT * FROM products WHERE id = ?').get(prod.id)) });
     }
     if ((m = p.match(/^\/api\/deliveries\/(\d+)\/accept$/)) && method === 'POST') {
+      if (!hasRight(req, 3)) return sendJSON(res, 403, { error: 'You are not allowed to accept a delivery' });
       const result = acceptDelivery(Number(m[1]));
       if (!result) return sendJSON(res, 404, { error: 'no pending delivery' });
       return sendJSON(res, 200, result);
     }
 
     if (p === '/api/held' && method === 'POST') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: "You are not allowed to hold a sale" });
       const body = await readBody(req);
       return sendJSON(res, 200, { held: addHeld(body) });
     }
     if ((m = p.match(/^\/api\/held\/(\d+)$/)) && method === 'DELETE') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: 'You are not allowed to drop a held sale' });
       db.prepare('DELETE FROM held_sales WHERE id = ?').run(Number(m[1]));
       return sendJSON(res, 200, { ok: true });
     }
 
     if ((m = p.match(/^\/api\/orders\/(\d+)$/)) && method === 'PATCH') {
+      if (!hasRight(req, 0)) return sendJSON(res, 403, { error: 'You are not allowed to update orders' });
       const body = await readBody(req);
       const o = advanceOrder(Number(m[1]), body.st);
       if (!o) return sendJSON(res, 404, { error: 'no such order' });
       return sendJSON(res, 200, { order: o });
     }
     if ((m = p.match(/^\/api\/orders\/(\d+)$/)) && method === 'DELETE') {
+      if (!hasRight(req, 2)) return sendJSON(res, 403, { error: 'Only a manager can remove an order' });
       db.prepare('DELETE FROM orders WHERE id = ?').run(Number(m[1]));
       return sendJSON(res, 200, { ok: true });
     }
