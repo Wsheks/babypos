@@ -227,6 +227,8 @@ ensureColumn('products', 'online', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('products', 'featured', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('products', 'wholesale_price', 'INTEGER NOT NULL DEFAULT 0');  // bulk/reseller price
 ensureColumn('sales', 'mpesa_ref', 'TEXT');  // customer's M-PESA confirmation code, when entered manually
+ensureColumn('products', 'design_group', 'TEXT');  // groups the sizes of one design (a size series); null = a plain single product
+ensureColumn('products', 'size_label', 'TEXT');    // this item's size within its series (e.g. an age like 3); null = not a series item
 ensureColumn('returns', 'sale_ref', 'TEXT');  // links a return back to the original sale receipt
 
 // ---------------------------------------------------------------

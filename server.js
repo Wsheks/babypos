@@ -187,7 +187,8 @@ function productOut(r) {
            ageMin: r.age_min, ageMax: r.age_max,
            sizes: safeArr(r.sizes), colours: safeArr(r.colours),
            wasPrice: r.was_price || null, image: r.image || '', images: safeArr(r.images),
-           online: r.online == null ? 1 : r.online, featured: r.featured ? 1 : 0 };
+           online: r.online == null ? 1 : r.online, featured: r.featured ? 1 : 0,
+           dg: r.design_group || null, sizeLabel: r.size_label || null };
 }
 function safeArr(s) { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 
@@ -522,6 +523,8 @@ function buildCatalogue() {
       tags: r.featured ? ['featured'] : [],
       image: r.image || '',
       images: (() => { const g = safeArr(r.images); return g.length ? g : (r.image ? [r.image] : []); })(),
+      dg: r.design_group || null,          // shared design id — sizes of one series share it
+      sizeLabel: r.size_label || null,     // this item's size within the series (e.g. an age)
     };
     if (r.was_price && r.was_price > r.selling_price) item.wasPrice = r.was_price;
     return item;
@@ -557,6 +560,31 @@ function addProduct(body) {
   }
   return productOut(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
 }
+
+// Create a size series: one design, several sizes (ages), each its own stock item + barcode,
+// all sharing a design_group so the website can group them into one product with a size picker.
+function addSeries(body) { return transaction(() => {
+  const dg = 'DG-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex');
+  const sizes = Array.isArray(body.sizes)
+    ? body.sizes.filter(s => s && s.age !== undefined && s.age !== null && String(s.age).trim() !== '')
+    : [];
+  const setGroup = db.prepare('UPDATE products SET design_group = ?, size_label = ? WHERE id = ?');
+  const ids = [];
+  sizes.forEach(s => {
+    const age = String(s.age).trim();
+    const prod = addProduct({
+      n: body.n, a: age + ' years', category: body.category,
+      c: body.c, p: body.p, w: body.w,
+      s: Math.max(0, Math.round(Number(s.stock) || 0)),
+      vat_type: body.vat_type, sizes: [age], colours: body.colours,
+      image: body.image, images: body.images,
+      online: (body.online === false || body.online === 0) ? 0 : 1, featured: body.featured, cashier: body.cashier,
+    });
+    setGroup.run(dg, age, prod.id);
+    ids.push(prod.id);
+  });
+  return { dg, count: ids.length, products: allProducts() };
+}); }
 
 function addHeld(body) {
   const id = db.prepare(
@@ -811,6 +839,14 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       if (!body.n || !String(body.n).trim()) return sendJSON(res, 400, { error: 'name required' });
       return sendJSON(res, 200, { product: addProduct(body) });
+    }
+
+    // Add a size series: one design, several sizes (ages), each its own stock item.
+    if (p === '/api/products/series' && method === 'POST') {
+      const body = await readBody(req);
+      if (!body.n || !String(body.n).trim()) return sendJSON(res, 400, { error: 'name required' });
+      if (!Array.isArray(body.sizes) || !body.sizes.length) return sendJSON(res, 400, { error: 'add at least one size' });
+      return sendJSON(res, 200, addSeries(body));
     }
 
     // Save shop settings (whitelisted so unknown keys are ignored).

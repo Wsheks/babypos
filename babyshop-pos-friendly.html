@@ -894,7 +894,7 @@ function sell(){
         ${(()=>{ const q=sellSearch.trim().toLowerCase(); const cards=PRODUCTS.map((p,i)=> (q && !(`${p.n} ${p.a||''} ${p.sku||''} ${p.category||''}`).toLowerCase().includes(q)) ? '' : `<button class="pcard" data-add="${i}">
           <div class="pic">${prodPic(p)}</div>
           <div class="nm">${p.n}</div>
-          <div class="age">${p.a}</div>
+          <div class="age">${p.sizeLabel?('Age '+p.sizeLabel):p.a}</div>
           <div class="foot">
             <div class="pr">${money(p.p)}</div>
             <span class="stk ${p.s<5?'low':''}">${p.s} left</span>
@@ -1189,7 +1189,16 @@ function productsPanel(){
           <select id="np-ageunit" class="sel" style="padding:11px 12px"><option>Months</option><option>Years</option></select>
         </div>
         <div style="font-size:12px;color:var(--mut);font-weight:600;margin-top:6px">Pick a range above, or type any range here (e.g. 6 to 18 months). Leave blank for "All ages".</div></div>
-      <div class="field"><label>Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric"></div>
+      <div class="field" style="grid-column:1 / -1">
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:700"><input type="checkbox" id="np-series"> This design comes in several sizes (a series)</label>
+        <div id="np-single-stock" style="margin-top:8px"><label style="display:block;font-weight:600;color:var(--mut);font-size:12.5px;margin-bottom:4px">Opening stock</label><input id="np-stock" placeholder="e.g. 20" inputmode="numeric" style="width:100%"></div>
+        <div id="np-series-grid" style="display:none;margin-top:8px">
+          <div style="font-weight:600;color:var(--mut);font-size:12.5px;margin-bottom:8px">How many of each age did you get? Fill only the sizes you have. Each age becomes its own item with its own barcode, and the website shows them as one design with a size picker.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px">
+            ${[0,1,2,3,4,5,6,7,8].map(a=>`<div style="text-align:center"><div style="font-weight:700;font-size:12px;margin-bottom:3px">Age ${a}</div><input data-seriesage="${a}" inputmode="numeric" placeholder="0" style="width:100%;text-align:center;padding:9px 4px;border:2px solid var(--line2);border-radius:9px;font:inherit;font-weight:700"></div>`).join('')}
+          </div>
+        </div>
+      </div>
       <div class="field"><label>What it cost you (KSh)</label><input id="np-cost" placeholder="e.g. 1100" inputmode="numeric"></div>
       <div class="field"><label>Selling price (KSh)</label><input id="np-price" placeholder="e.g. 2000" inputmode="numeric"></div>
       <div class="field"><label>Wholesale price (KSh)</label><input id="np-whole" placeholder="e.g. 1800 (optional)" inputmode="numeric"></div>
@@ -1234,7 +1243,7 @@ function productsPanel(){
       ${shownProds.map(pr=>`<div class="item-row">
         <div class="thumb">${prodPic(pr)}</div>
         <div>
-          <div class="ir-nm">${pr.n}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
+          <div class="ir-nm">${pr.n}${pr.sizeLabel?'<span class="pill" style="margin-left:8px;background:var(--teal-t,#e2f4f7);color:var(--teal,#0e94ac)">Age '+pr.sizeLabel+'</span>':''}${pr.vt==='exempt'?'<span class="pill new" style="margin-left:8px">VAT exempt</span>':''}${pr.online===0?'<span class="pill warn" style="margin-left:8px">Off website</span>':''}${(can(7)&&!pr.c)?'<span class="pill warn" style="margin-left:8px">No cost set</span>':''}</div>
           <div class="ir-sub">${pr.a} · ${pr.sku} · received ${pr.recv}</div>
         </div>
         <div class="ir-right">
@@ -2092,6 +2101,17 @@ screen.addEventListener('click',async e=>{
     // the website size chip is taken straight from the age range (e.g. 6 to 24 months -> "6-24m")
     const su=au.startsWith('month')?'m':'y';
     const sizes = (af&&at)?[`${af}-${at}${su}`]:(af||at)?[`${af||at}${su}`]:[];
+    // Size series: one design, several ages, each its own stock item.
+    if(g('np-series')&&g('np-series').checked){
+      const seriesSizes=[...document.querySelectorAll('[data-seriesage]')].map(inp=>({age:inp.dataset.seriesage,stock:num(inp.value)})).filter(x=>x.stock>0);
+      if(!seriesSizes.length){ toast('Enter how many you have for at least one age',true); return; }
+      const sbody={ n:name, p:num(g('np-price').value), w:num(g('np-whole').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
+        category:(category||'').trim(), colours, image:npImages[0]||'', images:[...npImages],
+        online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false, sizes:seriesSizes };
+      try{ const r=await api('/api/products/series','POST',sbody); if(r.products)PRODUCTS=r.products; toast('Added '+r.count+' size'+(r.count>1?'s':'')+' for '+name); }
+      catch(err){ toast(err.message||'Could not save the series',true); return; }
+      addingProduct=false; render(); return;
+    }
     const body={ n:name, a:age, p:num(g('np-price').value), w:num(g('np-whole').value), s:num(g('np-stock').value), c:num(g('np-cost').value), vat_type:(g('np-vat')&&g('np-vat').value)||'standard', cashier:currentUser?currentUser.name:'',
       category:(category||'').trim(), sizes, colours, was_price:num(val('np-was')), image:npImages[0]||'', images:[...npImages],
       online:g('np-online')?g('np-online').checked:true, featured:g('np-featured')?g('np-featured').checked:false };
@@ -2222,6 +2242,7 @@ screen.addEventListener('change',async e=>{
   if(e.target.id==='ret-item'&&e.target.tagName==='SELECT'){ const opt=e.target.selectedOptions[0]; const amt=document.getElementById('ret-amt'); if(opt&&amt) amt.value=opt.dataset.price||''; }
   // category dropdown: show the "new category" box when + New category is picked
   if(e.target.id==='np-category'){ const nf=document.getElementById('np-category-new'); if(nf){ nf.style.display=e.target.value==='__new__'?'block':'none'; if(e.target.value==='__new__') nf.focus(); } }
+  if(e.target.id==='np-series'){ const on=e.target.checked; const ss=document.getElementById('np-single-stock'), sg=document.getElementById('np-series-grid'); if(ss)ss.style.display=on?'none':''; if(sg)sg.style.display=on?'':'none'; }
   // product photo: downscale, upload, then show a preview and fill the image link
   if(e.target.id==='np-imgfile'){ const files=[...(e.target.files||[])]; if(!files.length) return; const st=document.getElementById('np-imgstatus'); if(st){ st.textContent='Uploading…'; st.style.color='var(--mut)'; }
     const rmbg=(document.getElementById('np-removebg')||{}).checked;
